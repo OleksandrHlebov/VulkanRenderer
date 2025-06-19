@@ -15,24 +15,24 @@ public:
 	App& operator=(App&&)      = delete;
 
 	void Run();
-	void Present(uint32_t imageIndex) const;
 
 private:
 	// TODO: specialisation
 	[[nodiscard]] VkShaderModule CreateShaderModule(std::vector<char> code) const;
 
+	void CreateWindow(int width, int height);
 	void CreateInstance();
 	void CreateSurface();
 	void CreateDevice();
-	void CreateCmdPool();
-	void CreateCommandBuffers();
-	void CreateWindow(int width, int height);
-	void End() const;
 	void CreateSwapchain();
 	void CreateSyncObjects();
 	void CreateGraphicsPipeline();
+	void CreateCmdPool();
+	void CreateCommandBuffers();
 	void RecordCommandBuffer(VkCommandBuffer const& commandBuffer, size_t imageIndex) const;
 	void Submit() const;
+	void Present(uint32_t imageIndex) const;
+	void End() const;
 
 	Context m_Context{};
 

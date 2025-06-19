@@ -1,6 +1,66 @@
 #include "app.h"
-
 #include "helper.h"
+
+App::App(int width, int height)
+{
+	CreateWindow(width, height);
+	CreateInstance();
+	CreateSurface();
+	CreateDevice();
+	CreateSwapchain();
+	CreateSyncObjects();
+	CreateGraphicsPipeline();
+	CreateCmdPool();
+	CreateCommandBuffers();
+}
+
+void App::Run()
+{
+	// main loop
+	while (!glfwWindowShouldClose(m_Context.Window))
+	{
+		glfwPollEvents();
+		m_Context.DispatchTable.waitForFences(1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, UINT64_MAX);
+
+		uint32_t imageIndex{};
+		m_Context.DispatchTable.acquireNextImageKHR(m_Context.Swapchain
+													, UINT64_MAX
+													, m_ImageAvailableSemaphores[m_CurrentFrame]
+													, VK_NULL_HANDLE
+													, &imageIndex);
+
+		m_Context.DispatchTable.resetFences(1, &m_InFlightFences[m_CurrentFrame]);
+
+		RecordCommandBuffer(m_CommandBuffers[m_CurrentFrame], imageIndex);
+
+		Submit();
+
+		Present(imageIndex);
+
+		++m_CurrentFrame;
+		m_CurrentFrame %= m_FramesInFlight;
+	}
+
+	if (m_Context.DispatchTable.deviceWaitIdle() != VK_SUCCESS)
+		throw std::runtime_error("Failed to wait for the device");
+
+	End();
+}
+
+VkShaderModule App::CreateShaderModule(std::vector<char> code) const
+{
+	VkShaderModule module{};
+
+	VkShaderModuleCreateInfo createInfo{};
+	createInfo.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	createInfo.pNext    = nullptr;
+	createInfo.flags    = 0;
+	createInfo.codeSize = code.size() * sizeof(code[0]);
+	createInfo.pCode    = reinterpret_cast<uint32_t*>(code.data());
+	vkCreateShaderModule(m_Context.Device, &createInfo, nullptr, &module);
+
+	return module;
+}
 
 void App::CreateWindow(int width, int height)
 {
@@ -88,128 +148,54 @@ void App::CreateDevice()
 	}
 }
 
-void App::CreateCmdPool()
+void App::CreateSwapchain()
 {
-	VkCommandPoolCreateInfo cmdPoolInfo{};
-	cmdPoolInfo.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-	cmdPoolInfo.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-	cmdPoolInfo.queueFamilyIndex = m_Context.Device.get_queue_index(vkb::QueueType::graphics).value();
-	if (m_Context.DispatchTable.createCommandPool(&cmdPoolInfo, nullptr, &m_CommandPool) != VK_SUCCESS)
-		throw std::runtime_error("Failed to create a command pool");
-}
-
-void App::CreateCommandBuffers()
-{
-	m_CommandBuffers.resize(m_FramesInFlight);
-
-	VkCommandBufferAllocateInfo cmdBufferAllocateInfo{};
-	cmdBufferAllocateInfo.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	cmdBufferAllocateInfo.commandPool        = m_CommandPool;
-	cmdBufferAllocateInfo.commandBufferCount = m_FramesInFlight;
-	cmdBufferAllocateInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-
-	if (m_Context.DispatchTable.allocateCommandBuffers(&cmdBufferAllocateInfo, m_CommandBuffers.data()) != VK_SUCCESS)
-		throw std::runtime_error("Failed to allocate command buffers");
-}
-
-App::App(int width, int height)
-{
-	CreateWindow(width, height);
-	CreateInstance();
-	CreateSurface();
-	CreateDevice();
-	CreateSwapchain();
-	CreateSyncObjects();
-	CreateGraphicsPipeline();
-	CreateCmdPool();
-	CreateCommandBuffers();
-}
-
-void App::Present(uint32_t imageIndex) const
-{
-	VkSwapchainKHR const swapchains[]{ m_Context.Swapchain };
-
-	VkPresentInfoKHR presentInfo{};
-	presentInfo.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-	presentInfo.waitSemaphoreCount = 1;
-	presentInfo.pWaitSemaphores    = &m_RenderFinishedSemaphores[m_CurrentFrame];
-	presentInfo.swapchainCount     = static_cast<uint32_t>(std::size(swapchains));
-	presentInfo.pSwapchains        = swapchains;
-	presentInfo.pImageIndices      = &imageIndex;
-
-	m_Context.DispatchTable.queuePresentKHR(m_Context.PresentQueue, &presentInfo);
-}
-
-void App::Run()
-{
-	// main loop
-	while (!glfwWindowShouldClose(m_Context.Window))
-	{
-		glfwPollEvents();
-		m_Context.DispatchTable.waitForFences(1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, UINT64_MAX);
-
-		uint32_t imageIndex{};
-		m_Context.DispatchTable.acquireNextImageKHR(m_Context.Swapchain
-													, UINT64_MAX
-													, m_ImageAvailableSemaphores[m_CurrentFrame]
-													, VK_NULL_HANDLE
-													, &imageIndex);
-
-		m_Context.DispatchTable.resetFences(1, &m_InFlightFences[m_CurrentFrame]);
-
-		RecordCommandBuffer(m_CommandBuffers[m_CurrentFrame], imageIndex);
-
-		Submit();
-
-		Present(imageIndex);
-
-		++m_CurrentFrame;
-		m_CurrentFrame %= m_FramesInFlight;
-	}
-
-	if (m_Context.DispatchTable.deviceWaitIdle() != VK_SUCCESS)
-		throw std::runtime_error("Failed to wait for the device");
-
-	End();
-}
-
-VkShaderModule App::CreateShaderModule(std::vector<char> code) const
-{
-	VkShaderModule module{};
-
-	VkShaderModuleCreateInfo createInfo{};
-	createInfo.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	createInfo.pNext    = nullptr;
-	createInfo.flags    = 0;
-	createInfo.codeSize = code.size() * sizeof(code[0]);
-	createInfo.pCode    = reinterpret_cast<uint32_t*>(code.data());
-	vkCreateShaderModule(m_Context.Device, &createInfo, nullptr, &module);
-
-	return module;
-}
-
-void App::End() const
-{
-	for (auto const& semaphore: m_ImageAvailableSemaphores)
-		m_Context.DispatchTable.destroySemaphore(semaphore, nullptr);
-
-	for (auto const& semaphore: m_RenderFinishedSemaphores)
-		m_Context.DispatchTable.destroySemaphore(semaphore, nullptr);
-
-	for (auto const& fence: m_InFlightFences)
-		m_Context.DispatchTable.destroyFence(fence, nullptr);
-
-	m_Context.DispatchTable.destroyCommandPool(m_CommandPool, nullptr);
-	m_Context.DispatchTable.destroyPipeline(m_Pipeline, nullptr);
-	m_Context.DispatchTable.destroyPipelineLayout(m_PipelineLayout, nullptr);
-	for (size_t index{}; index < m_Context.SwapchainImageViews.size(); ++index)
-		m_Context.DispatchTable.destroyImageView(m_Context.SwapchainImageViews[index], nullptr);
+	vkb::SwapchainBuilder builder{ m_Context.Device };
+	auto const            swapchainResult = builder
+								 .set_old_swapchain(m_Context.Swapchain)
+								 .build();
+	if (!swapchainResult)
+		throw std::runtime_error("Failed to create swapchain" + swapchainResult.error().message() +
+								 " " + std::to_string(swapchainResult.vk_result()));
 	vkb::destroy_swapchain(m_Context.Swapchain);
-	vkb::destroy_device(m_Context.Device);
-	vkDestroySurfaceKHR(m_Context.Instance, m_Context.Surface, nullptr);
-	vkb::destroy_instance(m_Context.Instance);
-	glfwDestroyWindow(m_Context.Window);
-	glfwTerminate();
+	m_Context.Swapchain = swapchainResult.value();
+
+	if (auto const result = m_Context.Swapchain.get_images();
+		!result)
+		throw std::runtime_error("Failed to create swapchain " + result.error().message() +
+								 " " + std::to_string(result.vk_result()));
+	else
+		m_Context.SwapchainImages = result.value();
+
+	if (auto const result = m_Context.Swapchain.get_image_views();
+		!result)
+		throw std::runtime_error("Failed to create swapchain " + result.error().message() +
+								 " " + std::to_string(result.vk_result()));
+	else
+		m_Context.SwapchainImageViews = result.value();
+
+	m_FramesInFlight = static_cast<uint32_t>(m_Context.SwapchainImages.size());
+}
+
+void App::CreateSyncObjects()
+{
+	VkSemaphoreCreateInfo semaphoreCreateInfo{};
+	semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+	VkFenceCreateInfo fenceCreateInfo{};
+	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+	m_ImageAvailableSemaphores.resize(m_FramesInFlight);
+	m_RenderFinishedSemaphores.resize(m_FramesInFlight);
+	m_InFlightFences.resize(m_FramesInFlight);
+
+	for (size_t index{}; index < m_FramesInFlight; ++index)
+		if (m_Context.DispatchTable.createSemaphore(&semaphoreCreateInfo, nullptr, &m_ImageAvailableSemaphores[index]) != VK_SUCCESS
+			||
+			m_Context.DispatchTable.createSemaphore(&semaphoreCreateInfo, nullptr, &m_RenderFinishedSemaphores[index]) != VK_SUCCESS
+			||
+			m_Context.DispatchTable.createFence(&fenceCreateInfo, nullptr, &m_InFlightFences[index]) != VK_SUCCESS)
+			throw std::runtime_error("Failed to create semaphores");
 }
 
 void App::CreateGraphicsPipeline()
@@ -340,54 +326,28 @@ void App::CreateGraphicsPipeline()
 	m_Context.DispatchTable.destroyShaderModule(frag, nullptr);
 }
 
-void App::CreateSwapchain()
+void App::CreateCmdPool()
 {
-	vkb::SwapchainBuilder builder{ m_Context.Device };
-	auto const            swapchainResult = builder
-								 .set_old_swapchain(m_Context.Swapchain)
-								 .build();
-	if (!swapchainResult)
-		throw std::runtime_error("Failed to create swapchain" + swapchainResult.error().message() +
-								 " " + std::to_string(swapchainResult.vk_result()));
-	vkb::destroy_swapchain(m_Context.Swapchain);
-	m_Context.Swapchain = swapchainResult.value();
-
-	if (auto const result = m_Context.Swapchain.get_images();
-		!result)
-		throw std::runtime_error("Failed to create swapchain " + result.error().message() +
-								 " " + std::to_string(result.vk_result()));
-	else
-		m_Context.SwapchainImages = result.value();
-
-	if (auto const result = m_Context.Swapchain.get_image_views();
-		!result)
-		throw std::runtime_error("Failed to create swapchain " + result.error().message() +
-								 " " + std::to_string(result.vk_result()));
-	else
-		m_Context.SwapchainImageViews = result.value();
-
-	m_FramesInFlight = static_cast<uint32_t>(m_Context.SwapchainImages.size());
+	VkCommandPoolCreateInfo cmdPoolInfo{};
+	cmdPoolInfo.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	cmdPoolInfo.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+	cmdPoolInfo.queueFamilyIndex = m_Context.Device.get_queue_index(vkb::QueueType::graphics).value();
+	if (m_Context.DispatchTable.createCommandPool(&cmdPoolInfo, nullptr, &m_CommandPool) != VK_SUCCESS)
+		throw std::runtime_error("Failed to create a command pool");
 }
 
-void App::CreateSyncObjects()
+void App::CreateCommandBuffers()
 {
-	VkSemaphoreCreateInfo semaphoreCreateInfo{};
-	semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-	VkFenceCreateInfo fenceCreateInfo{};
-	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-	fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+	m_CommandBuffers.resize(m_FramesInFlight);
 
-	m_ImageAvailableSemaphores.resize(m_FramesInFlight);
-	m_RenderFinishedSemaphores.resize(m_FramesInFlight);
-	m_InFlightFences.resize(m_FramesInFlight);
+	VkCommandBufferAllocateInfo cmdBufferAllocateInfo{};
+	cmdBufferAllocateInfo.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	cmdBufferAllocateInfo.commandPool        = m_CommandPool;
+	cmdBufferAllocateInfo.commandBufferCount = m_FramesInFlight;
+	cmdBufferAllocateInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 
-	for (size_t index{}; index < m_FramesInFlight; ++index)
-		if (m_Context.DispatchTable.createSemaphore(&semaphoreCreateInfo, nullptr, &m_ImageAvailableSemaphores[index]) != VK_SUCCESS
-			||
-			m_Context.DispatchTable.createSemaphore(&semaphoreCreateInfo, nullptr, &m_RenderFinishedSemaphores[index]) != VK_SUCCESS
-			||
-			m_Context.DispatchTable.createFence(&fenceCreateInfo, nullptr, &m_InFlightFences[index]) != VK_SUCCESS)
-			throw std::runtime_error("Failed to create semaphores");
+	if (m_Context.DispatchTable.allocateCommandBuffers(&cmdBufferAllocateInfo, m_CommandBuffers.data()) != VK_SUCCESS)
+		throw std::runtime_error("Failed to allocate command buffers");
 }
 
 void App::RecordCommandBuffer(VkCommandBuffer const& commandBuffer, size_t imageIndex) const
@@ -514,4 +474,43 @@ void App::Submit() const
 
 	if (m_Context.DispatchTable.queueSubmit2(m_Context.GraphicsQueue, 1, &submitInfo, m_InFlightFences[m_CurrentFrame]) != VK_SUCCESS)
 		throw std::runtime_error("Failed to submit command buffer");
+}
+
+void App::Present(uint32_t imageIndex) const
+{
+	VkSwapchainKHR const swapchains[]{ m_Context.Swapchain };
+
+	VkPresentInfoKHR presentInfo{};
+	presentInfo.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+	presentInfo.waitSemaphoreCount = 1;
+	presentInfo.pWaitSemaphores    = &m_RenderFinishedSemaphores[m_CurrentFrame];
+	presentInfo.swapchainCount     = static_cast<uint32_t>(std::size(swapchains));
+	presentInfo.pSwapchains        = swapchains;
+	presentInfo.pImageIndices      = &imageIndex;
+
+	m_Context.DispatchTable.queuePresentKHR(m_Context.PresentQueue, &presentInfo);
+}
+
+void App::End() const
+{
+	for (auto const& semaphore: m_ImageAvailableSemaphores)
+		m_Context.DispatchTable.destroySemaphore(semaphore, nullptr);
+
+	for (auto const& semaphore: m_RenderFinishedSemaphores)
+		m_Context.DispatchTable.destroySemaphore(semaphore, nullptr);
+
+	for (auto const& fence: m_InFlightFences)
+		m_Context.DispatchTable.destroyFence(fence, nullptr);
+
+	m_Context.DispatchTable.destroyCommandPool(m_CommandPool, nullptr);
+	m_Context.DispatchTable.destroyPipeline(m_Pipeline, nullptr);
+	m_Context.DispatchTable.destroyPipelineLayout(m_PipelineLayout, nullptr);
+	for (size_t index{}; index < m_Context.SwapchainImageViews.size(); ++index)
+		m_Context.DispatchTable.destroyImageView(m_Context.SwapchainImageViews[index], nullptr);
+	vkb::destroy_swapchain(m_Context.Swapchain);
+	vkb::destroy_device(m_Context.Device);
+	vkDestroySurfaceKHR(m_Context.Instance, m_Context.Surface, nullptr);
+	vkb::destroy_instance(m_Context.Instance);
+	glfwDestroyWindow(m_Context.Window);
+	glfwTerminate();
 }
