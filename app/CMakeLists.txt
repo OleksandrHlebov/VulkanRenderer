@@ -28,7 +28,7 @@ set(SHADER_SOURCES
 
 set(HEADER
     inc/helper.h
-    inc/context.h
+    ../vulkan-classes/inc/context.h
     inc/deletion_queue.h
     )
 

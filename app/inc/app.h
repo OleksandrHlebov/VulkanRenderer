@@ -1,6 +1,6 @@
 #ifndef APP_H
 #define APP_H
-#include "context.h"
+#include "../../vulkan-classes/inc/context.h"
 #include "VkBootstrap.h"
 
 class App final
@@ -38,7 +38,6 @@ private:
 
 	VkPipelineLayout m_PipelineLayout{};
 	VkPipeline       m_Pipeline{};
-	VkCommandPool    m_CommandPool{};
 
 	std::vector<VkCommandBuffer> m_CommandBuffers{};
 

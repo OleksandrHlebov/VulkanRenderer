@@ -389,12 +389,12 @@ void App::CreateCmdPool()
 	cmdPoolInfo.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	cmdPoolInfo.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 	cmdPoolInfo.queueFamilyIndex = m_Context.Device.get_queue_index(vkb::QueueType::graphics).value();
-	if (m_Context.DispatchTable.createCommandPool(&cmdPoolInfo, nullptr, &m_CommandPool) != VK_SUCCESS)
+	if (m_Context.DispatchTable.createCommandPool(&cmdPoolInfo, nullptr, &m_Context.CommandPool) != VK_SUCCESS)
 		throw std::runtime_error("Failed to create a command pool");
 
 	m_Context.DeletionQueue.Push([this]
 	{
-		m_Context.DispatchTable.destroyCommandPool(m_CommandPool, nullptr);
+		m_Context.DispatchTable.destroyCommandPool(m_Context.CommandPool, nullptr);
 	});
 }
 
@@ -404,7 +404,7 @@ void App::CreateCommandBuffers()
 
 	VkCommandBufferAllocateInfo cmdBufferAllocateInfo{};
 	cmdBufferAllocateInfo.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	cmdBufferAllocateInfo.commandPool        = m_CommandPool;
+	cmdBufferAllocateInfo.commandPool        = m_Context.CommandPool;
 	cmdBufferAllocateInfo.commandBufferCount = m_FramesInFlight;
 	cmdBufferAllocateInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 

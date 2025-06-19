@@ -1,6 +1,6 @@
 #ifndef CONTEXT_H
 #define CONTEXT_H
-#include "deletion_queue.h"
+#include "../../app/inc/deletion_queue.h"
 
 #include "VkBootstrap.h"
 #include "vulkan/vulkan.h"
@@ -20,6 +20,7 @@ struct Context
 	vkb::Device                Device;
 	vkb::DispatchTable         DispatchTable;
 	vkb::Swapchain             Swapchain;
+	VkCommandPool              CommandPool{};
 
 	std::vector<VkImage>     SwapchainImages;
 	std::vector<VkImageView> SwapchainImageViews;
