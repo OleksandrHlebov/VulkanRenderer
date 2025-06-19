@@ -24,6 +24,11 @@ FetchContent_Declare(
 		URL https://github.com/charles-lunarg/vk-bootstrap/archive/refs/tags/v1.3.302.tar.gz)
 FetchContent_MakeAvailable(vkBootstrap)
 
+FetchContent_Declare(
+		vma
+		URL https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/archive/refs/tags/v3.3.0.tar.gz)
+FetchContent_MakeAvailable(vma)
+
 find_package(Vulkan REQUIRED)
 
 add_subdirectory(vulkan-classes)
