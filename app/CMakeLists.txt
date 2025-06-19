@@ -26,16 +26,13 @@ set(SHADER_SOURCES
     "basic_color.frag"
     "basic_transform.vert")
 
-set(INCLUDE
-    inc/Helper.h)
-
-set(SOURCE src/app.cpp
-    inc/app.h
-    inc/Context.h)
+set(SOURCE
+    src/app.cpp
+    inc/helper.h
+    inc/context.h)
 
 add_library(App STATIC
-            ${SOURCE}
-            ${INCLUDE})
+            ${SOURCE})
 
 target_include_directories(${PROJECT_NAME} PRIVATE
                            ${CMAKE_CURRENT_SOURCE_DIR}/inc
@@ -43,10 +40,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 target_include_directories(${PROJECT_NAME} PUBLIC
                            ${CMAKE_CURRENT_SOURCE_DIR})
 
-target_link_libraries(${PROJECT_NAME} PUBLIC
-                      Vulkan::Vulkan
-                      glfw
-                      vk-bootstrap::vk-bootstrap)
+target_link_libraries(${PROJECT_NAME} PUBLIC VulkanClasses)
 
 foreach (shader IN LISTS SHADER_SOURCES)
 	Shader_Compile(${shader})

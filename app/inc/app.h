@@ -1,6 +1,6 @@
 #ifndef APP_H
 #define APP_H
-#include "Context.h"
+#include "context.h"
 #include "VkBootstrap.h"
 
 class App final
@@ -46,8 +46,8 @@ private:
 	std::vector<VkSemaphore> m_RenderFinishedSemaphores{};
 	std::vector<VkFence>     m_InFlightFences{};
 
-	size_t m_FramesInFlight{};
-	size_t m_CurrentFrame{};
+	uint32_t m_FramesInFlight{};
+	uint32_t m_CurrentFrame{};
 };
 
 #endif //APP_H

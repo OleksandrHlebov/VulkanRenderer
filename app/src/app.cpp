@@ -133,7 +133,7 @@ void App::Present(uint32_t imageIndex) const
 	presentInfo.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 	presentInfo.waitSemaphoreCount = 1;
 	presentInfo.pWaitSemaphores    = &m_RenderFinishedSemaphores[m_CurrentFrame];
-	presentInfo.swapchainCount     = std::size(swapchains);
+	presentInfo.swapchainCount     = static_cast<uint32_t>(std::size(swapchains));
 	presentInfo.pSwapchains        = swapchains;
 	presentInfo.pImageIndices      = &imageIndex;
 
@@ -283,14 +283,14 @@ void App::CreateGraphicsPipeline()
 
 	VkPipelineDynamicStateCreateInfo pipelineDynamicState{};
 	pipelineDynamicState.sType             = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-	pipelineDynamicState.dynamicStateCount = std::size(dynamicState);
+	pipelineDynamicState.dynamicStateCount = static_cast<uint32_t>(std::size(dynamicState));
 	pipelineDynamicState.pDynamicStates    = dynamicState;
 
 	VkFormat colorAttachmentFormats[]{ m_Context.Swapchain.image_format };
 
 	VkPipelineRenderingCreateInfo pipelineRendering{};
 	pipelineRendering.sType                   = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-	pipelineRendering.colorAttachmentCount    = std::size(colorAttachmentFormats);
+	pipelineRendering.colorAttachmentCount    = static_cast<uint32_t>(std::size(colorAttachmentFormats));
 	pipelineRendering.pColorAttachmentFormats = colorAttachmentFormats;
 
 	VkPipelineDepthStencilStateCreateInfo depthStencilState{};
@@ -366,7 +366,7 @@ void App::CreateSwapchain()
 	else
 		m_Context.SwapchainImageViews = result.value();
 
-	m_FramesInFlight = m_Context.SwapchainImages.size();
+	m_FramesInFlight = static_cast<uint32_t>(m_Context.SwapchainImages.size());
 }
 
 void App::CreateSyncObjects()
