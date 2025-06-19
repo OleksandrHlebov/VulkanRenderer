@@ -26,13 +26,18 @@ set(SHADER_SOURCES
     "basic_color.frag"
     "basic_transform.vert")
 
-set(SOURCE
-    src/app.cpp
+set(HEADER
     inc/helper.h
-    inc/context.h)
+    inc/context.h
+    inc/DeletionQueue.h
+    )
+
+set(SOURCE
+    src/app.cpp)
 
 add_library(App STATIC
-            ${SOURCE})
+            ${SOURCE}
+            ${HEADER})
 
 target_include_directories(${PROJECT_NAME} PRIVATE
                            ${CMAKE_CURRENT_SOURCE_DIR}/inc

@@ -1,5 +1,7 @@
 #ifndef CONTEXT_H
 #define CONTEXT_H
+#include "DeletionQueue.h"
+
 #include "VkBootstrap.h"
 #include "vulkan/vulkan.h"
 
@@ -7,6 +9,8 @@
 
 struct Context
 {
+	DeletionQueue DeletionQueue;
+
 	GLFWwindow*                Window{};
 	vkb::Instance              Instance;
 	vkb::InstanceDispatchTable InstanceDispatchTable;

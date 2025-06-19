@@ -32,7 +32,7 @@ private:
 	void RecordCommandBuffer(VkCommandBuffer const& commandBuffer, size_t imageIndex) const;
 	void Submit() const;
 	void Present(uint32_t imageIndex) const;
-	void End() const;
+	void End();
 
 	Context m_Context{};
 

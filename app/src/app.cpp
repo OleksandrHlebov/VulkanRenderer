@@ -68,6 +68,11 @@ void App::CreateWindow(int width, int height)
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 	m_Context.Window = glfwCreateWindow(width, height, "Base window", nullptr, nullptr);
+	m_Context.DeletionQueue.Push([this]
+	{
+		glfwDestroyWindow(m_Context.Window);
+		glfwTerminate();
+	});
 }
 
 void App::CreateInstance()
@@ -83,6 +88,11 @@ void App::CreateInstance()
 
 	m_Context.Instance              = instanceResult.value();
 	m_Context.InstanceDispatchTable = m_Context.Instance.make_table(); // instance function table
+
+	m_Context.DeletionQueue.Push([this]
+	{
+		vkb::destroy_instance(m_Context.Instance);
+	});
 }
 
 void App::CreateSurface()
@@ -95,6 +105,10 @@ void App::CreateSurface()
 		if (glfwGetError(&errorMessage))
 			throw std::runtime_error(errorMessage);
 	}
+	m_Context.DeletionQueue.Push([this]
+	{
+		m_Context.InstanceDispatchTable.destroySurfaceKHR(m_Context.Surface, nullptr);
+	});
 }
 
 void App::CreateDevice()
@@ -146,6 +160,10 @@ void App::CreateDevice()
 			throw std::runtime_error("Failed to get a presenting queue");
 		m_Context.PresentQueue = result.value();
 	}
+	m_Context.DeletionQueue.Push([this]
+	{
+		vkb::destroy_device(m_Context.Device);
+	});
 }
 
 void App::CreateSwapchain()
@@ -175,6 +193,11 @@ void App::CreateSwapchain()
 		m_Context.SwapchainImageViews = result.value();
 
 	m_FramesInFlight = static_cast<uint32_t>(m_Context.SwapchainImages.size());
+	m_Context.DeletionQueue.Push([this]
+	{
+		m_Context.Swapchain.destroy_image_views(m_Context.SwapchainImageViews);
+		vkb::destroy_swapchain(m_Context.Swapchain);
+	});
 }
 
 void App::CreateSyncObjects()
@@ -190,12 +213,20 @@ void App::CreateSyncObjects()
 	m_InFlightFences.resize(m_FramesInFlight);
 
 	for (size_t index{}; index < m_FramesInFlight; ++index)
+	{
 		if (m_Context.DispatchTable.createSemaphore(&semaphoreCreateInfo, nullptr, &m_ImageAvailableSemaphores[index]) != VK_SUCCESS
 			||
 			m_Context.DispatchTable.createSemaphore(&semaphoreCreateInfo, nullptr, &m_RenderFinishedSemaphores[index]) != VK_SUCCESS
 			||
 			m_Context.DispatchTable.createFence(&fenceCreateInfo, nullptr, &m_InFlightFences[index]) != VK_SUCCESS)
 			throw std::runtime_error("Failed to create semaphores");
+		m_Context.DeletionQueue.Push([index, this]
+		{
+			m_Context.DispatchTable.destroySemaphore(m_ImageAvailableSemaphores[index], nullptr);
+			m_Context.DispatchTable.destroySemaphore(m_RenderFinishedSemaphores[index], nullptr);
+			m_Context.DispatchTable.destroyFence(m_InFlightFences[index], nullptr);
+		});
+	}
 }
 
 void App::CreateGraphicsPipeline()
@@ -265,6 +296,11 @@ void App::CreateGraphicsPipeline()
 	if (m_Context.DispatchTable.createPipelineLayout(&pipelineLayout, nullptr, &m_PipelineLayout) != VK_SUCCESS)
 		throw std::runtime_error("Failed to create pipeline layout");
 
+	m_Context.DeletionQueue.Push([this]
+	{
+		m_Context.DispatchTable.destroyPipelineLayout(m_PipelineLayout, nullptr);
+	});
+
 	VkDynamicState dynamicState[]{ VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 
 	VkPipelineDynamicStateCreateInfo pipelineDynamicState{};
@@ -320,7 +356,18 @@ void App::CreateGraphicsPipeline()
 	pipelineCreateInfo.renderPass          = VK_NULL_HANDLE;
 	pipelineCreateInfo.layout              = m_PipelineLayout;
 
-	m_Context.DispatchTable.createGraphicsPipelines(VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &m_Pipeline);
+	if (m_Context.DispatchTable.createGraphicsPipelines(VK_NULL_HANDLE
+														, 1
+														, &pipelineCreateInfo
+														, nullptr
+														, &m_Pipeline) != VK_SUCCESS)
+		throw std::runtime_error("failed to create graphics pipeline");
+
+	m_Context.DeletionQueue.
+			  Push([this]
+			  {
+				  m_Context.DispatchTable.destroyPipeline(m_Pipeline, nullptr);
+			  });
 
 	m_Context.DispatchTable.destroyShaderModule(vert, nullptr);
 	m_Context.DispatchTable.destroyShaderModule(frag, nullptr);
@@ -334,6 +381,11 @@ void App::CreateCmdPool()
 	cmdPoolInfo.queueFamilyIndex = m_Context.Device.get_queue_index(vkb::QueueType::graphics).value();
 	if (m_Context.DispatchTable.createCommandPool(&cmdPoolInfo, nullptr, &m_CommandPool) != VK_SUCCESS)
 		throw std::runtime_error("Failed to create a command pool");
+
+	m_Context.DeletionQueue.Push([this]
+	{
+		m_Context.DispatchTable.destroyCommandPool(m_CommandPool, nullptr);
+	});
 }
 
 void App::CreateCommandBuffers()
@@ -491,26 +543,7 @@ void App::Present(uint32_t imageIndex) const
 	m_Context.DispatchTable.queuePresentKHR(m_Context.PresentQueue, &presentInfo);
 }
 
-void App::End() const
+void App::End()
 {
-	for (auto const& semaphore: m_ImageAvailableSemaphores)
-		m_Context.DispatchTable.destroySemaphore(semaphore, nullptr);
-
-	for (auto const& semaphore: m_RenderFinishedSemaphores)
-		m_Context.DispatchTable.destroySemaphore(semaphore, nullptr);
-
-	for (auto const& fence: m_InFlightFences)
-		m_Context.DispatchTable.destroyFence(fence, nullptr);
-
-	m_Context.DispatchTable.destroyCommandPool(m_CommandPool, nullptr);
-	m_Context.DispatchTable.destroyPipeline(m_Pipeline, nullptr);
-	m_Context.DispatchTable.destroyPipelineLayout(m_PipelineLayout, nullptr);
-	for (size_t index{}; index < m_Context.SwapchainImageViews.size(); ++index)
-		m_Context.DispatchTable.destroyImageView(m_Context.SwapchainImageViews[index], nullptr);
-	vkb::destroy_swapchain(m_Context.Swapchain);
-	vkb::destroy_device(m_Context.Device);
-	vkDestroySurfaceKHR(m_Context.Instance, m_Context.Surface, nullptr);
-	vkb::destroy_instance(m_Context.Instance);
-	glfwDestroyWindow(m_Context.Window);
-	glfwTerminate();
+	m_Context.DeletionQueue.Flush();
 }
