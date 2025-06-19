@@ -1,15 +1,17 @@
 #ifndef CONTEXT_H
 #define CONTEXT_H
-#include "DeletionQueue.h"
+#include "deletion_queue.h"
 
 #include "VkBootstrap.h"
 #include "vulkan/vulkan.h"
+#include "vma_usage.h"
 
 #include "GLFW/glfw3.h"
 
 struct Context
 {
 	DeletionQueue DeletionQueue;
+	VmaAllocator  Allocator;
 
 	GLFWwindow*                Window{};
 	vkb::Instance              Instance;

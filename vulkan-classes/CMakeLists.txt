@@ -6,20 +6,27 @@ set(CMAKE_CXX_STANDARD 20)
 set(INCLUDE)
 
 set(SOURCE
-    src/main.cpp)
+    inc/vma_usage.h
+    src/main.cpp
+    src/vma_usage.cpp)
 
 add_library(VulkanClasses STATIC
             ${SOURCE}
             ${INCLUDE})
 
-target_include_directories(${PROJECT_NAME} PRIVATE
+if (MSVC)
+	set_source_files_properties(src/vma_usage.cpp PROPERTIES COMPILE_FLAGS /W0)
+else ()
+	set_source_files_properties(src/vma_usage.cpp PROPERTIES COMPILE_FLAGS -w)
+endif ()
+
+target_include_directories(${PROJECT_NAME} PUBLIC
                            ${CMAKE_CURRENT_SOURCE_DIR}/inc
                            ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_include_directories(${PROJECT_NAME} PUBLIC
-                           ${CMAKE_CURRENT_SOURCE_DIR}
-                           ${vma_SOURCE_DIR}/include)
 
 target_link_libraries(${PROJECT_NAME} PUBLIC
                       Vulkan::Vulkan
                       glfw
-                      vk-bootstrap::vk-bootstrap)
+                      vk-bootstrap::vk-bootstrap
+                      GPUOpen::VulkanMemoryAllocator)
+

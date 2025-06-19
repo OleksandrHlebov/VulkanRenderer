@@ -3,14 +3,6 @@ project(VulkanResearch)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/W4>
-                    $<$<CXX_COMPILER_ID:MSVC>:/WX>
-                    $<$<CXX_COMPILER_ID:GNU>:-Wall>
-                    $<$<CXX_COMPILER_ID:GNU>:-Wextra>
-                    $<$<CXX_COMPILER_ID:GNU>:-Werror>
-                    $<$<CXX_COMPILER_ID:Clang>:-Wall>
-                    $<$<CXX_COMPILER_ID:Clang>:-Wextra>
-                    $<$<CXX_COMPILER_ID:Clang>:-Werror>)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -27,9 +19,19 @@ FetchContent_MakeAvailable(vkBootstrap)
 FetchContent_Declare(
 		vma
 		URL https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/archive/refs/tags/v3.3.0.tar.gz)
+set(VMA_BUILD_SAMPLES ON)
 FetchContent_MakeAvailable(vma)
 
 find_package(Vulkan REQUIRED)
+
+add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/W4>
+                    $<$<CXX_COMPILER_ID:MSVC>:/WX>
+                    $<$<CXX_COMPILER_ID:GNU>:-Wall>
+                    $<$<CXX_COMPILER_ID:GNU>:-Wextra>
+                    $<$<CXX_COMPILER_ID:GNU>:-Werror>
+                    $<$<CXX_COMPILER_ID:Clang>:-Wall>
+                    $<$<CXX_COMPILER_ID:Clang>:-Wextra>
+                    $<$<CXX_COMPILER_ID:Clang>:-Werror>)
 
 add_subdirectory(vulkan-classes)
 add_subdirectory(app)

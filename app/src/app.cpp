@@ -1,5 +1,6 @@
 #include "app.h"
 #include "helper.h"
+#include "vma_usage.h"
 
 App::App(int width, int height)
 {
@@ -113,8 +114,6 @@ void App::CreateSurface()
 
 void App::CreateDevice()
 {
-	VkPhysicalDeviceFeatures2 features{};
-	features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 	VkPhysicalDeviceVulkan11Features features11{};
 	features11.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
 	VkPhysicalDeviceVulkan12Features features12{};
@@ -163,6 +162,17 @@ void App::CreateDevice()
 	m_Context.DeletionQueue.Push([this]
 	{
 		vkb::destroy_device(m_Context.Device);
+	});
+
+	VmaAllocatorCreateInfo allocatorInfo{};
+	allocatorInfo.device           = m_Context.Device;
+	allocatorInfo.instance         = m_Context.Instance;
+	allocatorInfo.physicalDevice   = physicalDeviceResult.value();
+	allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_3;
+	vmaCreateAllocator(&allocatorInfo, &m_Context.Allocator);
+	m_Context.DeletionQueue.Push([this]
+	{
+		vmaDestroyAllocator(m_Context.Allocator);
 	});
 }
 

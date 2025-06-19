@@ -29,16 +29,16 @@ set(SHADER_SOURCES
 set(HEADER
     inc/helper.h
     inc/context.h
-    inc/DeletionQueue.h
+    inc/deletion_queue.h
     )
 
 set(SOURCE
-    src/app.cpp)
+    src/app.cpp
+    ../vulkan-classes/inc/vma_usage.h)
 
 add_library(App STATIC
             ${SOURCE}
             ${HEADER})
-
 target_include_directories(${PROJECT_NAME} PRIVATE
                            ${CMAKE_CURRENT_SOURCE_DIR}/inc
                            ${CMAKE_CURRENT_SOURCE_DIR}/src)

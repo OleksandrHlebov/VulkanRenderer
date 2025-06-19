@@ -6,7 +6,7 @@
 
 namespace help
 {
-	inline std::vector<char> ReadFile(const std::string &filename)
+	inline std::vector<char> ReadFile(const std::string& filename)
 	{
 		std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
@@ -21,7 +21,7 @@ namespace help
 
 		file.close();
 
-		return std::move(buffer);
+		return buffer;
 	}
 }
 
