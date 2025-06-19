@@ -28,13 +28,13 @@ set(SHADER_SOURCES
 
 set(HEADER
     inc/helper.h
-    ../vulkan-classes/inc/context.h
     inc/deletion_queue.h
-    )
+    inc/camera.h
+    inc/world_time.h)
 
 set(SOURCE
     src/app.cpp
-    ../vulkan-classes/inc/vma_usage.h)
+    src/world_time.cpp)
 
 add_library(App STATIC
             ${SOURCE}
@@ -45,7 +45,14 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 target_include_directories(${PROJECT_NAME} PUBLIC
                            ${CMAKE_CURRENT_SOURCE_DIR})
 
-target_link_libraries(${PROJECT_NAME} PUBLIC VulkanClasses)
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+                           GLM_FORCE_DEPTH_ZERO_TO_ONE
+                           GLM_FORCE_RADIANS
+                           GLM_ENABLE_EXPERIMENTAL)
+
+target_link_libraries(${PROJECT_NAME} PUBLIC
+                      VulkanClasses
+                      glm::glm-header-only)
 
 foreach (shader IN LISTS SHADER_SOURCES)
 	Shader_Compile(${shader})

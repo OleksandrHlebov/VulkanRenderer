@@ -1,6 +1,9 @@
 #ifndef APP_H
 #define APP_H
-#include "../../vulkan-classes/inc/context.h"
+#include <memory>
+
+#include "context.h"
+#include "camera.h"
 #include "VkBootstrap.h"
 
 class App final
@@ -34,7 +37,8 @@ private:
 	void Present(uint32_t imageIndex) const;
 	void End();
 
-	Context m_Context{};
+	std::unique_ptr<Camera> m_Camera;
+	Context                 m_Context{};
 
 	VkPipelineLayout m_PipelineLayout{};
 	VkPipeline       m_Pipeline{};

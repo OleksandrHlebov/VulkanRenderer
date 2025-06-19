@@ -4,14 +4,25 @@
 
 App::App(int width, int height)
 {
+	m_Camera = std::make_unique<Camera>(glm::vec3{ .0f, 1.f, .0f }
+										, 45.f
+										, static_cast<float>(width) / height // NOLINT(*-narrowing-conversions)
+										, .0f
+										, 5.f);
 	CreateWindow(width, height);
 	CreateInstance();
 	CreateSurface();
 	CreateDevice();
 	CreateSwapchain();
-	CreateSyncObjects();
-	CreateGraphicsPipeline();
 	CreateCmdPool();
+	// TODO: Load scene
+	// TODO: Descriptor set layout
+	// TODO: Create resources (depth/textures)
+	CreateGraphicsPipeline();
+	CreateSyncObjects();
+	// TODO: MVP UBO
+	// TODO: Descriptor pool
+	// TODO: Descriptor sets
 	CreateCommandBuffers();
 }
 
@@ -22,6 +33,8 @@ void App::Run()
 	{
 		glfwPollEvents();
 		m_Context.DispatchTable.waitForFences(1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, UINT64_MAX);
+
+		m_Camera->Update(m_Context.Window);
 
 		uint32_t imageIndex{};
 		m_Context.DispatchTable.acquireNextImageKHR(m_Context.Swapchain

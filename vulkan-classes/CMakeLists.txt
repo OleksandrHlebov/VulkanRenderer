@@ -4,10 +4,10 @@ project(VulkanClasses)
 set(CMAKE_CXX_STANDARD 20)
 
 set(INCLUDE
+    inc/vma_usage.h
     inc/image.h)
 
 set(SOURCE
-    inc/vma_usage.h
     src/main.cpp
     src/vma_usage.cpp
     src/image.cpp)
