@@ -1,6 +1,6 @@
 #ifndef CONTEXT_H
 #define CONTEXT_H
-#include "../../app/inc/deletion_queue.h"
+#include "deletion_queue.h"
 
 #include "VkBootstrap.h"
 #include "vulkan/vulkan.h"

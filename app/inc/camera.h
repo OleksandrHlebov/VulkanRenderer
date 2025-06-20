@@ -19,6 +19,8 @@ public:
 		, m_Far{ far }
 	{
 		RecalculateProjection();
+		m_TotalYaw   = glm::degrees(atan2(m_Forward.z, m_Forward.x));
+		m_TotalPitch = glm::degrees(asin(m_Forward.y));
 	}
 
 	~Camera() = default;
@@ -62,22 +64,22 @@ public:
 			if (glm::vec2 const delta{ cache_xPos - xPos, cache_yPos - yPos };
 				abs(delta.x) > FLT_EPSILON || abs(delta.y) > FLT_EPSILON)
 			{
-				static float totalYaw{};
-				static float totalPitch{};
-				totalYaw += delta.x * m_Sensitivity;
-				totalPitch += delta.y * m_Sensitivity;
-				totalPitch = std::clamp(totalPitch, -89.f, 89.f);
+				m_TotalYaw -= delta.x * m_Sensitivity;
+				m_TotalPitch += delta.y * m_Sensitivity;
+				m_TotalPitch = std::clamp(m_TotalPitch, -89.f, 89.f);
 
-				m_Forward.x = cos(glm::radians(totalYaw)) * cos(glm::radians(totalPitch));
-				m_Forward.y = sin(glm::radians(totalYaw)) * cos(glm::radians(totalPitch));
-				m_Forward.z = sin(glm::radians(totalPitch));
+				m_Forward.x = cos(glm::radians(m_TotalYaw)) * cos(glm::radians(m_TotalPitch));
+				m_Forward.y = sin(glm::radians(m_TotalPitch));
+				m_Forward.z = sin(glm::radians(m_TotalYaw)) * cos(glm::radians(m_TotalPitch));
 			}
 		}
+		cache_xPos = xPos;
+		cache_yPos = yPos;
 	}
 
 	[[nodiscard]] glm::mat4 CalculateViewMatrix() const
 	{
-		return glm::lookAt(m_Position, m_Position + WORLD_FORWARD, WORLD_UP);
+		return glm::lookAt(m_Position, m_Position + m_Forward, WORLD_UP);
 	}
 
 	[[nodiscard]] glm::mat4 const& GetProjection() const
@@ -106,6 +108,8 @@ private
 	float     m_Sensitivity{ 0.2f };
 	float     m_Near;
 	float     m_Far;
+	float     m_TotalYaw{ 0 };
+	float     m_TotalPitch{ 0 };
 };
 
 #endif //CAMERA_H

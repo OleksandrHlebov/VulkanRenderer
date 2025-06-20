@@ -29,8 +29,12 @@ private:
 	void CreateDevice();
 	void CreateSwapchain();
 	void CreateSyncObjects();
+	void CreateDescriptorPool();
+	void CreateDescriptorSets();
 	void CreateGraphicsPipeline();
 	void CreateCmdPool();
+	void CreateDescriptorSetLayouts();
+	void CreateResources();
 	void CreateCommandBuffers();
 	void RecordCommandBuffer(VkCommandBuffer const& commandBuffer, size_t imageIndex) const;
 	void Submit() const;
@@ -40,10 +44,19 @@ private:
 	std::unique_ptr<Camera> m_Camera;
 	Context                 m_Context{};
 
+	VkDescriptorSetLayout m_FrameDescSetLayout{};
+	VkDescriptorPool      m_DescPool{};
+
 	VkPipelineLayout m_PipelineLayout{};
 	VkPipeline       m_Pipeline{};
 
 	std::vector<VkCommandBuffer> m_CommandBuffers{};
+
+	std::vector<VkBuffer>      m_MVPUBOs{};
+	std::vector<VmaAllocation> m_MVPUBOAllocs{};
+	std::vector<void*>         m_MVPUBOData{};
+
+	std::vector<VkDescriptorSet> m_FrameDescriptorSets{};
 
 	std::vector<VkSemaphore> m_ImageAvailableSemaphores{};
 	std::vector<VkSemaphore> m_RenderFinishedSemaphores{};

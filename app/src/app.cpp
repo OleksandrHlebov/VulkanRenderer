@@ -1,14 +1,16 @@
 #include "app.h"
+
+#include "datatypes.h"
 #include "helper.h"
 #include "vma_usage.h"
 
 App::App(int width, int height)
 {
-	m_Camera = std::make_unique<Camera>(glm::vec3{ .0f, 1.f, .0f }
+	m_Camera = std::make_unique<Camera>(glm::vec3{ .0f, .0f, .0f }
 										, 45.f
 										, static_cast<float>(width) / height // NOLINT(*-narrowing-conversions)
 										, .0f
-										, 5.f);
+										, 100.f);
 	CreateWindow(width, height);
 	CreateInstance();
 	CreateSurface();
@@ -16,13 +18,13 @@ App::App(int width, int height)
 	CreateSwapchain();
 	CreateCmdPool();
 	// TODO: Load scene
-	// TODO: Descriptor set layout
+	CreateDescriptorSetLayouts();
 	// TODO: Create resources (depth/textures)
+	CreateResources();
 	CreateGraphicsPipeline();
 	CreateSyncObjects();
-	// TODO: MVP UBO
-	// TODO: Descriptor pool
-	// TODO: Descriptor sets
+	CreateDescriptorPool();
+	CreateDescriptorSets();
 	CreateCommandBuffers();
 }
 
@@ -34,8 +36,12 @@ void App::Run()
 		glfwPollEvents();
 		m_Context.DispatchTable.waitForFences(1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, UINT64_MAX);
 
+		WorldTime::Tick();
 		m_Camera->Update(m_Context.Window);
 
+		ModelViewProj mvp{ glm::mat4{ 1 }, m_Camera->CalculateViewMatrix(), m_Camera->GetProjection() };
+
+		memcpy(m_MVPUBOData[m_CurrentFrame], &mvp, sizeof(mvp));
 		uint32_t imageIndex{};
 		m_Context.DispatchTable.acquireNextImageKHR(m_Context.Swapchain
 													, UINT64_MAX
@@ -252,6 +258,61 @@ void App::CreateSyncObjects()
 	}
 }
 
+void App::CreateDescriptorPool()
+{
+	VkDescriptorPoolSize descriptorPoolSize{};
+	descriptorPoolSize.type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorPoolSize.descriptorCount = m_FramesInFlight;
+
+	VkDescriptorPoolCreateInfo poolCreateInfo{};
+	poolCreateInfo.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	poolCreateInfo.poolSizeCount = 1;
+	poolCreateInfo.pPoolSizes    = &descriptorPoolSize;
+	poolCreateInfo.maxSets       = m_FramesInFlight;
+
+	if (auto const result = m_Context.DispatchTable.createDescriptorPool(&poolCreateInfo, nullptr, &m_DescPool);
+		result != VK_SUCCESS)
+		throw std::runtime_error("Failed to create descriptor pool " + result);
+	m_Context.DeletionQueue.Push([this]
+	{
+		m_Context.DispatchTable.destroyDescriptorPool(m_DescPool, nullptr);
+	});
+}
+
+void App::CreateDescriptorSets()
+{
+	VkDescriptorSetLayout const layouts[]{ m_FrameDescSetLayout, m_FrameDescSetLayout, m_FrameDescSetLayout };
+
+	VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{};
+	descriptorSetAllocateInfo.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	descriptorSetAllocateInfo.descriptorPool     = m_DescPool;
+	descriptorSetAllocateInfo.descriptorSetCount = m_FramesInFlight;
+	descriptorSetAllocateInfo.pSetLayouts        = layouts;
+
+	m_FrameDescriptorSets.resize(m_FramesInFlight);
+	if (auto const result = m_Context.DispatchTable.allocateDescriptorSets(&descriptorSetAllocateInfo, m_FrameDescriptorSets.data());
+		result != VK_SUCCESS)
+		throw std::runtime_error("Failed to allocate descriptor sets");
+
+	for (uint32_t index{}; index < m_FramesInFlight; ++index)
+	{
+		VkDescriptorBufferInfo bufferInfo{};
+		bufferInfo.buffer = m_MVPUBOs[index];
+		bufferInfo.range  = VK_WHOLE_SIZE;
+		bufferInfo.offset = 0;
+
+		VkWriteDescriptorSet writeDescriptorSet{};
+		writeDescriptorSet.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writeDescriptorSet.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		writeDescriptorSet.dstSet          = m_FrameDescriptorSets[index];
+		writeDescriptorSet.dstBinding      = 0;
+		writeDescriptorSet.dstArrayElement = 0;
+		writeDescriptorSet.descriptorCount = 1;
+		writeDescriptorSet.pBufferInfo     = &bufferInfo;
+		m_Context.DispatchTable.updateDescriptorSets(1, &writeDescriptorSet, 0, nullptr);
+	}
+}
+
 void App::CreateGraphicsPipeline()
 {
 	VkPipelineVertexInputStateCreateInfo vertexInputState{};
@@ -312,8 +373,8 @@ void App::CreateGraphicsPipeline()
 
 	VkPipelineLayoutCreateInfo pipelineLayout{};
 	pipelineLayout.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pipelineLayout.setLayoutCount         = 0;
-	pipelineLayout.pSetLayouts            = nullptr;
+	pipelineLayout.setLayoutCount         = 1;
+	pipelineLayout.pSetLayouts            = &m_FrameDescSetLayout;
 	pipelineLayout.pushConstantRangeCount = 0;
 
 	if (m_Context.DispatchTable.createPipelineLayout(&pipelineLayout, nullptr, &m_PipelineLayout) != VK_SUCCESS)
@@ -411,6 +472,60 @@ void App::CreateCmdPool()
 	});
 }
 
+void App::CreateDescriptorSetLayouts()
+{
+	VkDescriptorSetLayoutBinding binding{};
+	binding.binding         = 0;
+	binding.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	binding.stageFlags      = VK_SHADER_STAGE_VERTEX_BIT;
+	binding.descriptorCount = 1;
+
+	VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
+	descriptorSetLayoutCreateInfo.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	descriptorSetLayoutCreateInfo.flags        = 0;
+	descriptorSetLayoutCreateInfo.bindingCount = 1;
+	descriptorSetLayoutCreateInfo.pBindings    = &binding;
+
+	if (m_Context.DispatchTable.createDescriptorSetLayout(&descriptorSetLayoutCreateInfo, nullptr, &m_FrameDescSetLayout) != VK_SUCCESS)
+		throw std::runtime_error("Failed to create frame descriptor set layout");
+
+	m_Context.DeletionQueue.Push([this]
+	{
+		m_Context.DispatchTable.destroyDescriptorSetLayout(m_FrameDescSetLayout, nullptr);
+	});
+}
+
+void App::CreateResources()
+{
+	VkBufferCreateInfo bufferCreateInfo{};
+	bufferCreateInfo.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	bufferCreateInfo.usage       = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+	bufferCreateInfo.size        = sizeof(ModelViewProj);
+
+	VmaAllocationCreateInfo vmaAllocationCreateInfo{};
+	vmaAllocationCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+
+	m_MVPUBOs.resize(m_FramesInFlight);
+	m_MVPUBOAllocs.resize(m_FramesInFlight);
+	m_MVPUBOData.resize(m_FramesInFlight);
+	for (uint32_t index{}; index < m_FramesInFlight; ++index)
+	{
+		vmaCreateBuffer(m_Context.Allocator
+						, &bufferCreateInfo
+						, &vmaAllocationCreateInfo
+						, &m_MVPUBOs[index]
+						, &m_MVPUBOAllocs[index]
+						, nullptr);
+		vmaMapMemory(m_Context.Allocator, m_MVPUBOAllocs[index], &m_MVPUBOData[index]);
+		m_Context.DeletionQueue.Push([this, index]
+		{
+			vmaUnmapMemory(m_Context.Allocator, m_MVPUBOAllocs[index]);
+			vmaDestroyBuffer(m_Context.Allocator, m_MVPUBOs[index], m_MVPUBOAllocs[index]);
+		});
+	}
+}
+
 void App::CreateCommandBuffers()
 {
 	m_CommandBuffers.resize(m_FramesInFlight);
@@ -423,6 +538,12 @@ void App::CreateCommandBuffers()
 
 	if (m_Context.DispatchTable.allocateCommandBuffers(&cmdBufferAllocateInfo, m_CommandBuffers.data()) != VK_SUCCESS)
 		throw std::runtime_error("Failed to allocate command buffers");
+	m_Context.DeletionQueue.Push([this]
+	{
+		m_Context.DispatchTable.freeCommandBuffers(m_Context.CommandPool
+												   , static_cast<uint32_t>(m_CommandBuffers.size())
+												   , m_CommandBuffers.data());
+	});
 }
 
 void App::RecordCommandBuffer(VkCommandBuffer const& commandBuffer, size_t imageIndex) const
@@ -474,6 +595,14 @@ void App::RecordCommandBuffer(VkCommandBuffer const& commandBuffer, size_t image
 
 	m_Context.DispatchTable.cmdBeginRendering(commandBuffer, &renderingInfo);
 	m_Context.DispatchTable.cmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
+	m_Context.DispatchTable.cmdBindDescriptorSets(commandBuffer
+												  , VK_PIPELINE_BIND_POINT_GRAPHICS
+												  , m_PipelineLayout
+												  , 0
+												  , 1
+												  , &m_FrameDescriptorSets[m_CurrentFrame]
+												  , 0
+												  , nullptr);
 
 	VkViewport viewport{};
 	viewport.width    = static_cast<float>(m_Context.Swapchain.extent.width);
@@ -547,7 +676,11 @@ void App::Submit() const
 	submitInfo.signalSemaphoreInfoCount = 1;
 	submitInfo.pSignalSemaphoreInfos    = &signalSemaphoreSubmitInfo;
 
-	if (m_Context.DispatchTable.queueSubmit2(m_Context.GraphicsQueue, 1, &submitInfo, m_InFlightFences[m_CurrentFrame]) != VK_SUCCESS)
+	if (VkResult const result = m_Context.DispatchTable.queueSubmit2(m_Context.GraphicsQueue
+																	 , 1
+																	 , &submitInfo
+																	 , m_InFlightFences[m_CurrentFrame]);
+		result != VK_SUCCESS)
 		throw std::runtime_error("Failed to submit command buffer");
 }
 
