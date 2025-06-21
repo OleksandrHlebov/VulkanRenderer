@@ -2,6 +2,7 @@
 
 #include "datatypes.h"
 #include "helper.h"
+#include "image.h"
 #include "vma_usage.h"
 
 App::App(int width, int height)
@@ -157,6 +158,11 @@ void App::CreateDevice()
 									  .select();
 	if (!physicalDeviceResult)
 		throw std::runtime_error("failed to create physical device");
+
+	m_DepthFormat = help::FindSupportedFormat(physicalDeviceResult.value()
+											  , { VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT }
+											  , VK_IMAGE_TILING_OPTIMAL
+											  , VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
 	auto const deviceResult = vkb::DeviceBuilder{ physicalDeviceResult.value() }.build();
 	if (!deviceResult)
@@ -398,11 +404,12 @@ void App::CreateGraphicsPipeline()
 	pipelineRendering.sType                   = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
 	pipelineRendering.colorAttachmentCount    = static_cast<uint32_t>(std::size(colorAttachmentFormats));
 	pipelineRendering.pColorAttachmentFormats = colorAttachmentFormats;
+	pipelineRendering.depthAttachmentFormat   = m_DepthFormat;
 
 	VkPipelineDepthStencilStateCreateInfo depthStencilState{};
 	depthStencilState.sType                 = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-	depthStencilState.depthTestEnable       = VK_FALSE;
-	depthStencilState.depthWriteEnable      = VK_FALSE;
+	depthStencilState.depthTestEnable       = VK_TRUE;
+	depthStencilState.depthWriteEnable      = VK_TRUE;
 	depthStencilState.depthCompareOp        = VK_COMPARE_OP_LESS_OR_EQUAL;
 	depthStencilState.depthBoundsTestEnable = VK_FALSE;
 	depthStencilState.stencilTestEnable     = VK_FALSE;
@@ -497,11 +504,28 @@ void App::CreateDescriptorSetLayouts()
 
 void App::CreateResources()
 {
-	BufferBuilder builder{ m_Context };
-	builder.SetMemoryUsage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+	// mvp ubo
+	{
+		BufferBuilder builder{ m_Context };
+		builder.SetMemoryUsage(VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-	for (uint32_t index{}; index < m_FramesInFlight; ++index)
-		m_MVPUBOs.emplace_back(builder.Build(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, sizeof(ModelViewProj), true));
+		for (uint32_t index{}; index < m_FramesInFlight; ++index)
+			m_MVPUBOs.emplace_back(builder.Build(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, sizeof(ModelViewProj), true));
+	}
+	// depth image
+	{
+		ImageBuilder builder{ m_Context };
+		Image        image = builder
+					  .SetExtent(m_Context.Swapchain.extent)
+					  .SetFormat(m_DepthFormat)
+					  .SetType(VK_IMAGE_TYPE_2D)
+					  .SetAspectFlags(VK_IMAGE_ASPECT_DEPTH_BIT | help::HasStencilComponent(m_DepthFormat) * VK_IMAGE_ASPECT_STENCIL_BIT)
+					  .Build(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+		m_DepthImage = std::make_unique<Image>(std::move(image));
+
+		ImageView imageView = m_DepthImage->CreateView(m_Context, VK_IMAGE_VIEW_TYPE_2D);
+		m_DepthImageView    = std::make_unique<ImageView>(std::move(imageView));
+	}
 }
 
 void App::CreateCommandBuffers()
@@ -555,6 +579,31 @@ void App::RecordCommandBuffer(VkCommandBuffer const& commandBuffer, size_t image
 		dependencyInfo.pImageMemoryBarriers    = &memoryBarrier;
 		m_Context.DispatchTable.cmdPipelineBarrier2(commandBuffer, &dependencyInfo);
 	}
+	// depth image to attachment optimal
+	{
+		VkImageMemoryBarrier2 memoryBarrier{};
+		memoryBarrier.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+		memoryBarrier.image               = *m_DepthImage;
+		memoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		memoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		memoryBarrier.srcAccessMask       = VK_ACCESS_2_NONE;
+		memoryBarrier.dstAccessMask       = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		memoryBarrier.srcStageMask        = VK_PIPELINE_STAGE_2_NONE;
+		memoryBarrier.dstStageMask        = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT;
+		memoryBarrier.oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED;
+		memoryBarrier.newLayout           = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+
+		memoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		memoryBarrier.subresourceRange.levelCount = 1;
+		memoryBarrier.subresourceRange.layerCount = 1;
+
+		VkDependencyInfo dependencyInfo{};
+		dependencyInfo.sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+		dependencyInfo.pNext                   = nullptr;
+		dependencyInfo.imageMemoryBarrierCount = 1;
+		dependencyInfo.pImageMemoryBarriers    = &memoryBarrier;
+		m_Context.DispatchTable.cmdPipelineBarrier2(commandBuffer, &dependencyInfo);
+	}
 
 	VkRenderingAttachmentInfo renderingAttachmentInfo{};
 	renderingAttachmentInfo.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -564,10 +613,19 @@ void App::RecordCommandBuffer(VkCommandBuffer const& commandBuffer, size_t image
 	renderingAttachmentInfo.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	renderingAttachmentInfo.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
 
+	VkRenderingAttachmentInfo depthAttachmentInfo{};
+	depthAttachmentInfo.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+	depthAttachmentInfo.clearValue  = { .depthStencil = { 1.0f, 0 } };
+	depthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+	depthAttachmentInfo.imageView   = *m_DepthImageView;
+	depthAttachmentInfo.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	depthAttachmentInfo.storeOp     = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
 	VkRenderingInfo renderingInfo{};
 	renderingInfo.sType                = VK_STRUCTURE_TYPE_RENDERING_INFO;
 	renderingInfo.colorAttachmentCount = 1;
 	renderingInfo.pColorAttachments    = &renderingAttachmentInfo;
+	renderingInfo.pDepthAttachment     = &depthAttachmentInfo;
 	renderingInfo.layerCount           = 1;
 	renderingInfo.renderArea           = VkRect2D{ {}, m_Context.Swapchain.extent };
 

@@ -1,5 +1,33 @@
 #include "image.h"
 
+ImageView Image::CreateView
+(Context& context, VkImageViewType type, uint32_t baseLayer, uint32_t layerCount, uint32_t baseMipLevel, uint32_t levelCount) const
+{
+	ImageView imageView{};
+
+	VkImageViewCreateInfo imageViewCreateInfo{};
+	imageViewCreateInfo.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	imageViewCreateInfo.flags                           = 0;
+	imageViewCreateInfo.image                           = m_Image;
+	imageViewCreateInfo.viewType                        = type;
+	imageViewCreateInfo.format                          = m_Format;
+	imageViewCreateInfo.subresourceRange.aspectMask     = m_AspectFlags;
+	imageViewCreateInfo.subresourceRange.layerCount     = layerCount;
+	imageViewCreateInfo.subresourceRange.levelCount     = levelCount;
+	imageViewCreateInfo.subresourceRange.baseMipLevel   = baseMipLevel;
+	imageViewCreateInfo.subresourceRange.baseArrayLayer = baseLayer;
+
+	if (auto const result = context.DispatchTable.createImageView(&imageViewCreateInfo, nullptr, imageView);
+		result != VK_SUCCESS)
+		throw std::runtime_error("Failed to create image view");
+	context.DeletionQueue.Push([context = &context, imageView = imageView.m_ImageView]
+	{
+		context->DispatchTable.destroyImageView(imageView, nullptr);
+	});
+
+	return imageView;
+}
+
 ImageBuilder& ImageBuilder::SetFormat(VkFormat format)
 {
 	m_Format = format;
@@ -84,6 +112,11 @@ Image ImageBuilder::Build(VkImageUsageFlags usage) const
 	image.m_Layout      = VK_IMAGE_LAYOUT_UNDEFINED;
 
 	vmaCreateImage(m_Context.Allocator, &createInfo, &vmaAllocationCreateInfo, image, &image.m_Allocation, nullptr);
+
+	m_Context.DeletionQueue.Push([context = &m_Context, image = image.m_Image, allocation = image.m_Allocation]
+	{
+		vmaDestroyImage(context->Allocator, image, allocation);
+	});
 
 	return image;
 }

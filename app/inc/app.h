@@ -2,14 +2,18 @@
 #define APP_H
 #include <memory>
 
-#include "Buffer.h"
+#include "buffer.h"
 #include "context.h"
 #include "camera.h"
+#include "image.h"
 #include "VkBootstrap.h"
 
 class App final
 {
 public:
+	template<typename T>
+	using uptr = std::unique_ptr<T>;
+
 	App(int width, int height);
 	~App() = default;
 
@@ -50,6 +54,10 @@ private:
 
 	VkPipelineLayout m_PipelineLayout{};
 	VkPipeline       m_Pipeline{};
+
+	VkFormat        m_DepthFormat{};
+	uptr<Image>     m_DepthImage{};
+	uptr<ImageView> m_DepthImageView{};
 
 	std::vector<VkCommandBuffer> m_CommandBuffers{};
 

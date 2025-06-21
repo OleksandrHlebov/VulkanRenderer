@@ -23,6 +23,29 @@ namespace help
 
 		return buffer;
 	}
+
+	inline VkFormat FindSupportedFormat
+	(VkPhysicalDevice physicalDevice, const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features)
+	{
+		for (VkFormat const& format: candidates)
+		{
+			VkFormatProperties properties{};
+			vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &properties);
+
+			if (tiling == VK_IMAGE_TILING_LINEAR && (properties.linearTilingFeatures & features) == features)
+				return format;
+
+			if (tiling == VK_IMAGE_TILING_OPTIMAL && (properties.optimalTilingFeatures & features) == features)
+				return format;
+		}
+
+		throw std::runtime_error("failed to find supported format");
+	}
+
+	inline bool HasStencilComponent(VkFormat format)
+	{
+		return format == VK_FORMAT_D24_UNORM_S8_UINT || format == VK_FORMAT_D32_SFLOAT_S8_UINT;
+	}
 }
 
 #endif //HELPER_H

@@ -1,6 +1,5 @@
 #ifndef BUFFER_H
 #define BUFFER_H
-#include <vulkan/vulkan_core.h>
 
 #include "context.h"
 #include "vma_usage.h"
@@ -15,6 +14,11 @@ public:
 	Buffer& operator=(Buffer&&)      = default;
 	Buffer& operator=(Buffer const&) = delete;
 
+	VkDeviceSize GetSize() const
+	{
+		return m_AllocationInfo.size;
+	}
+
 	template<typename DataType>
 	void UpdateData(DataType const& data)
 	{
@@ -22,12 +26,7 @@ public:
 		memcpy(m_Data, &data, sizeof(DataType));
 	}
 
-	operator VkBuffer&()
-	{
-		return m_Buffer;
-	}
-
-	operator VkBuffer const&() const
+	operator VkBuffer() const
 	{
 		return m_Buffer;
 	}
@@ -45,9 +44,10 @@ public:
 private:
 	friend class BufferBuilder;
 	Buffer() = default;
-	VkBuffer      m_Buffer{ VK_NULL_HANDLE };
-	VmaAllocation m_Allocation{ VK_NULL_HANDLE };
-	void*         m_Data{ nullptr };
+	VkBuffer          m_Buffer{ VK_NULL_HANDLE };
+	VmaAllocation     m_Allocation{ VK_NULL_HANDLE };
+	VmaAllocationInfo m_AllocationInfo{};
+	void*             m_Data{ nullptr };
 };
 
 class BufferBuilder final
@@ -97,6 +97,8 @@ public:
 		vmaCreateBuffer(m_Context.Allocator, &m_BufferCreateInfo, &m_AllocationCreateInfo, buffer, &buffer.m_Allocation, nullptr);
 		if (mapMemory)
 			vmaMapMemory(m_Context.Allocator, buffer.m_Allocation, &buffer.m_Data);
+
+		vmaGetAllocationInfo(m_Context.Allocator, buffer.m_Allocation, &buffer.m_AllocationInfo);
 
 		m_Context.DeletionQueue.Push([context = &m_Context
 										 , buffer = buffer.m_Buffer

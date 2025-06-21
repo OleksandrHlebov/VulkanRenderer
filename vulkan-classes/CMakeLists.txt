@@ -7,7 +7,8 @@ set(INCLUDE
     inc/vma_usage.h
     inc/image.h
     inc/datatypes.h
-    inc/Buffer.h)
+    inc/Buffer.h
+    inc/image_view.h)
 
 set(SOURCE
     src/main.cpp

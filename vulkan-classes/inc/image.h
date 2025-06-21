@@ -1,6 +1,7 @@
 #ifndef IMAGE_H
 #define IMAGE_H
 #include "context.h"
+#include "image_view.h"
 #include "vma_usage.h"
 
 class Image final
@@ -13,12 +14,23 @@ public:
 	Image& operator=(Image&&)      = default;
 	Image& operator=(Image const&) = delete;
 
+	ImageView CreateView
+	(
+		Context&   context, VkImageViewType type, uint32_t baseLayer = 0, uint32_t layerCount = 1, uint32_t baseMipLevel = 0
+		, uint32_t levelCount                                        = 1
+	) const;
+
 	operator VkImage() const
 	{
 		return m_Image;
 	}
 
 	operator VkImage*()
+	{
+		return &m_Image;
+	}
+
+	operator VkImage const*() const
 	{
 		return &m_Image;
 	}
@@ -48,7 +60,7 @@ private:
 class ImageBuilder final
 {
 public:
-	ImageBuilder(Context const& context)
+	ImageBuilder(Context& context)
 		: m_Context{ context } {}
 
 	~ImageBuilder() = default;
@@ -71,7 +83,7 @@ public:
 	[[nodiscard]] Image Build(VkImageUsageFlags usage) const;
 
 private:
-	Context const&     m_Context;
+	Context&           m_Context;
 	VkFormat           m_Format{ VK_FORMAT_R8G8B8A8_SRGB };
 	VkExtent2D         m_Extent{};
 	VkImageTiling      m_Tiling{ VK_IMAGE_TILING_OPTIMAL };
