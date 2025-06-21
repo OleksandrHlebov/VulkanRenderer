@@ -32,18 +32,20 @@ public:
 		VkPipelineStageFlags DstStageMask{};
 		VkImageLayout        NewLayout{};
 
+		// in case of multi-layered images
 		uint32_t BaseLayer{ 0 };
 		uint32_t LayerCount{ 1 };
 		uint32_t BaseMipLevel{ 0 };
 		uint32_t LevelCount{ 1 };
 
+		// in case of synchronization between separate queues
 		uint32_t SrcQueue{ VK_QUEUE_FAMILY_IGNORED };
 		uint32_t DstQueue{ VK_QUEUE_FAMILY_IGNORED };
 	};
 
 	void MakeTransition(Context const& context, VkCommandBuffer commandBuffer, Transition const& transition) const;
 
-	[[nodiscard]] VkImageLayout GetLayout(uint32_t mipLevel, uint32_t layer) const
+	[[nodiscard]] VkImageLayout GetLayout(uint32_t mipLevel = 0, uint32_t layer = 0) const
 	{
 		assert(mipLevel < m_MipLevels && layer < m_Layers);
 
@@ -55,8 +57,7 @@ public:
 		return m_Allocation;
 	}
 
-	static void ConvertFromSwapchainVkImages
-	(Context& context, std::vector<Image>& convertedImages);
+	static void ConvertFromSwapchainVkImages(Context& context, std::vector<Image>& convertedImages);
 
 	operator VkImage() const
 	{

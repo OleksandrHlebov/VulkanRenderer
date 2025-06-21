@@ -572,7 +572,7 @@ void App::RecordCommandBuffer(VkCommandBuffer commandBuffer, size_t imageIndex) 
 	VkRenderingAttachmentInfo renderingAttachmentInfo{};
 	renderingAttachmentInfo.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
 	renderingAttachmentInfo.clearValue  = { { .03f, .03f, .03f, 1.f } };
-	renderingAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	renderingAttachmentInfo.imageLayout = m_SwapchainImages[imageIndex].GetLayout();
 	renderingAttachmentInfo.imageView   = m_SwapchainImageViews[imageIndex];
 	renderingAttachmentInfo.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	renderingAttachmentInfo.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
@@ -580,7 +580,7 @@ void App::RecordCommandBuffer(VkCommandBuffer commandBuffer, size_t imageIndex) 
 	VkRenderingAttachmentInfo depthAttachmentInfo{};
 	depthAttachmentInfo.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
 	depthAttachmentInfo.clearValue  = { .depthStencil = { 1.0f, 0 } };
-	depthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+	depthAttachmentInfo.imageLayout = m_DepthImage->GetLayout();
 	depthAttachmentInfo.imageView   = *m_DepthImageView;
 	depthAttachmentInfo.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	depthAttachmentInfo.storeOp     = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -594,31 +594,34 @@ void App::RecordCommandBuffer(VkCommandBuffer commandBuffer, size_t imageIndex) 
 	renderingInfo.renderArea           = VkRect2D{ {}, m_Context.Swapchain.extent };
 
 	m_Context.DispatchTable.cmdBeginRendering(commandBuffer, &renderingInfo);
-	m_Context.DispatchTable.cmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
-	m_Context.DispatchTable.cmdBindDescriptorSets(commandBuffer
-												  , VK_PIPELINE_BIND_POINT_GRAPHICS
-												  , m_PipelineLayout
-												  , 0
-												  , 1
-												  , &m_FrameDescriptorSets[m_CurrentFrame]
-												  , 0
-												  , nullptr);
+	// main pass
+	{
+		m_Context.DispatchTable.cmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
+		m_Context.DispatchTable.cmdBindDescriptorSets(commandBuffer
+													  , VK_PIPELINE_BIND_POINT_GRAPHICS
+													  , m_PipelineLayout
+													  , 0
+													  , 1
+													  , &m_FrameDescriptorSets[m_CurrentFrame]
+													  , 0
+													  , nullptr);
 
-	VkViewport viewport{};
-	viewport.width    = static_cast<float>(m_Context.Swapchain.extent.width);
-	viewport.height   = static_cast<float>(m_Context.Swapchain.extent.height);
-	viewport.minDepth = 0.0f;
-	viewport.maxDepth = 1.0f;
+		VkViewport viewport{};
+		viewport.width    = static_cast<float>(m_Context.Swapchain.extent.width);
+		viewport.height   = static_cast<float>(m_Context.Swapchain.extent.height);
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
 
-	m_Context.DispatchTable.cmdSetViewport(commandBuffer, 0, 1, &viewport);
+		m_Context.DispatchTable.cmdSetViewport(commandBuffer, 0, 1, &viewport);
 
-	VkRect2D scissor{};
-	scissor.offset = { 0, 0 };
-	scissor.extent = m_Context.Swapchain.extent;
+		VkRect2D scissor{};
+		scissor.offset = { 0, 0 };
+		scissor.extent = m_Context.Swapchain.extent;
 
-	m_Context.DispatchTable.cmdSetScissor(commandBuffer, 0, 1, &scissor);
+		m_Context.DispatchTable.cmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-	m_Context.DispatchTable.cmdDraw(commandBuffer, 3, 1, 0, 0);
+		m_Context.DispatchTable.cmdDraw(commandBuffer, 3, 1, 0, 0);
+	}
 	m_Context.DispatchTable.cmdEndRendering(commandBuffer);
 
 	// swapchain image to present
