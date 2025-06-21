@@ -2,6 +2,7 @@
 #define APP_H
 #include <memory>
 
+#include "Buffer.h"
 #include "context.h"
 #include "camera.h"
 #include "VkBootstrap.h"
@@ -52,9 +53,7 @@ private:
 
 	std::vector<VkCommandBuffer> m_CommandBuffers{};
 
-	std::vector<VkBuffer>      m_MVPUBOs{};
-	std::vector<VmaAllocation> m_MVPUBOAllocs{};
-	std::vector<void*>         m_MVPUBOData{};
+	std::vector<Buffer> m_MVPUBOs{};
 
 	std::vector<VkDescriptorSet> m_FrameDescriptorSets{};
 

@@ -36,12 +36,12 @@ void App::Run()
 		glfwPollEvents();
 		m_Context.DispatchTable.waitForFences(1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, UINT64_MAX);
 
-		WorldTime::Tick();
+		world_time::Tick();
 		m_Camera->Update(m_Context.Window);
 
-		ModelViewProj mvp{ glm::mat4{ 1 }, m_Camera->CalculateViewMatrix(), m_Camera->GetProjection() };
+		ModelViewProj const mvp{ glm::mat4{ 1 }, m_Camera->CalculateViewMatrix(), m_Camera->GetProjection() };
 
-		memcpy(m_MVPUBOData[m_CurrentFrame], &mvp, sizeof(mvp));
+		m_MVPUBOs[m_CurrentFrame].UpdateData(mvp);
 		uint32_t imageIndex{};
 		m_Context.DispatchTable.acquireNextImageKHR(m_Context.Swapchain
 													, UINT64_MAX
@@ -497,33 +497,11 @@ void App::CreateDescriptorSetLayouts()
 
 void App::CreateResources()
 {
-	VkBufferCreateInfo bufferCreateInfo{};
-	bufferCreateInfo.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	bufferCreateInfo.usage       = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-	bufferCreateInfo.size        = sizeof(ModelViewProj);
+	BufferBuilder builder{ m_Context };
+	builder.SetMemoryUsage(VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-	VmaAllocationCreateInfo vmaAllocationCreateInfo{};
-	vmaAllocationCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-
-	m_MVPUBOs.resize(m_FramesInFlight);
-	m_MVPUBOAllocs.resize(m_FramesInFlight);
-	m_MVPUBOData.resize(m_FramesInFlight);
 	for (uint32_t index{}; index < m_FramesInFlight; ++index)
-	{
-		vmaCreateBuffer(m_Context.Allocator
-						, &bufferCreateInfo
-						, &vmaAllocationCreateInfo
-						, &m_MVPUBOs[index]
-						, &m_MVPUBOAllocs[index]
-						, nullptr);
-		vmaMapMemory(m_Context.Allocator, m_MVPUBOAllocs[index], &m_MVPUBOData[index]);
-		m_Context.DeletionQueue.Push([this, index]
-		{
-			vmaUnmapMemory(m_Context.Allocator, m_MVPUBOAllocs[index]);
-			vmaDestroyBuffer(m_Context.Allocator, m_MVPUBOs[index], m_MVPUBOAllocs[index]);
-		});
-	}
+		m_MVPUBOs.emplace_back(builder.Build(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, sizeof(ModelViewProj), true));
 }
 
 void App::CreateCommandBuffers()

@@ -8,12 +8,12 @@ namespace
 	float elapsedSec{ .0f };
 }
 
-float WorldTime::GetElapsedSec()
+float world_time::GetElapsedSec()
 {
 	return elapsedSec;
 }
 
-void WorldTime::Tick()
+void world_time::Tick()
 {
 	auto const currentTime{ std::chrono::steady_clock::now() };
 	elapsedSec     = std::chrono::duration<float>(currentTime - lastUpdateTime).count();

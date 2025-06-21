@@ -41,7 +41,7 @@ public:
 		if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS)
 		{
 			float const boost{ 1.f + static_cast<float>(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT)) * m_Boost };
-			float const travelThisUpdate{ m_Speed * boost * WorldTime::GetElapsedSec() };
+			float const travelThisUpdate{ m_Speed * boost * world_time::GetElapsedSec() };
 			if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
 				m_Position += m_Forward * travelThisUpdate;
 			if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)

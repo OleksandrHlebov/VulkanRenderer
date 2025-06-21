@@ -6,7 +6,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(INCLUDE
     inc/vma_usage.h
     inc/image.h
-    inc/datatypes.h)
+    inc/datatypes.h
+    inc/Buffer.h)
 
 set(SOURCE
     src/main.cpp

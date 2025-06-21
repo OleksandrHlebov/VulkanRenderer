@@ -1,7 +1,7 @@
 #ifndef WORLDTIME_H
 #define WORLDTIME_H
 
-namespace WorldTime
+namespace world_time
 {
 	float GetElapsedSec();
 	void  Tick();
