@@ -22,9 +22,6 @@ struct Context
 	vkb::Swapchain             Swapchain;
 	VkCommandPool              CommandPool{};
 
-	std::vector<VkImage>     SwapchainImages;
-	std::vector<VkImageView> SwapchainImageViews;
-
 	VkQueue GraphicsQueue{};
 	VkQueue PresentQueue{};
 };

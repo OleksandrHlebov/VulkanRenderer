@@ -1,6 +1,6 @@
 #ifndef DATATYPES_H
 #define DATATYPES_H
-#include "glm/mat4x4.hpp"
+#include "glm/glm.hpp"
 
 struct ModelViewProj
 {

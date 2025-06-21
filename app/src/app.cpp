@@ -213,24 +213,12 @@ void App::CreateSwapchain()
 	vkb::destroy_swapchain(m_Context.Swapchain);
 	m_Context.Swapchain = swapchainResult.value();
 
-	if (auto const result = m_Context.Swapchain.get_images();
-		!result)
-		throw std::runtime_error("Failed to create swapchain " + result.error().message() +
-								 " " + std::to_string(result.vk_result()));
-	else
-		m_Context.SwapchainImages = result.value();
+	Image::ConvertFromSwapchainVkImages(m_Context, m_SwapchainImages);
+	ImageView::ConvertFromSwapchainVkImageViews(m_Context, m_SwapchainImageViews);
 
-	if (auto const result = m_Context.Swapchain.get_image_views();
-		!result)
-		throw std::runtime_error("Failed to create swapchain " + result.error().message() +
-								 " " + std::to_string(result.vk_result()));
-	else
-		m_Context.SwapchainImageViews = result.value();
-
-	m_FramesInFlight = static_cast<uint32_t>(m_Context.SwapchainImages.size());
+	m_FramesInFlight = static_cast<uint32_t>(m_Context.Swapchain.image_count);
 	m_Context.DeletionQueue.Push([this]
 	{
-		m_Context.Swapchain.destroy_image_views(m_Context.SwapchainImageViews);
 		vkb::destroy_swapchain(m_Context.Swapchain);
 	});
 }
@@ -548,68 +536,44 @@ void App::CreateCommandBuffers()
 	});
 }
 
-void App::RecordCommandBuffer(VkCommandBuffer const& commandBuffer, size_t imageIndex) const
+void App::RecordCommandBuffer(VkCommandBuffer commandBuffer, size_t imageIndex) const
 {
 	VkCommandBufferBeginInfo beginInfo{};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	m_Context.DispatchTable.beginCommandBuffer(commandBuffer, &beginInfo);
-
+	Image const& swapchainImage = m_SwapchainImages[imageIndex];
 	// swapchain image to attachment optimal
 	{
-		VkImageMemoryBarrier2 memoryBarrier{};
-		memoryBarrier.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-		memoryBarrier.image               = m_Context.SwapchainImages[imageIndex];
-		memoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		memoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		memoryBarrier.srcAccessMask       = VK_ACCESS_2_NONE;
-		memoryBarrier.dstAccessMask       = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-		memoryBarrier.srcStageMask        = VK_PIPELINE_STAGE_2_NONE;
-		memoryBarrier.dstStageMask        = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-		memoryBarrier.oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED;
-		memoryBarrier.newLayout           = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-		memoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		memoryBarrier.subresourceRange.levelCount = 1;
-		memoryBarrier.subresourceRange.layerCount = 1;
-
-		VkDependencyInfo dependencyInfo{};
-		dependencyInfo.sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-		dependencyInfo.pNext                   = nullptr;
-		dependencyInfo.imageMemoryBarrierCount = 1;
-		dependencyInfo.pImageMemoryBarriers    = &memoryBarrier;
-		m_Context.DispatchTable.cmdPipelineBarrier2(commandBuffer, &dependencyInfo);
+		Image::Transition transition{};
+		//
+		{
+			transition.SrcAccessMask = VK_ACCESS_2_NONE;
+			transition.DstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			transition.SrcStageMask  = VK_PIPELINE_STAGE_2_NONE;
+			transition.DstStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+			transition.NewLayout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		}
+		swapchainImage.MakeTransition(m_Context, commandBuffer, transition);
 	}
 	// depth image to attachment optimal
 	{
-		VkImageMemoryBarrier2 memoryBarrier{};
-		memoryBarrier.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-		memoryBarrier.image               = *m_DepthImage;
-		memoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		memoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		memoryBarrier.srcAccessMask       = VK_ACCESS_2_NONE;
-		memoryBarrier.dstAccessMask       = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-		memoryBarrier.srcStageMask        = VK_PIPELINE_STAGE_2_NONE;
-		memoryBarrier.dstStageMask        = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT;
-		memoryBarrier.oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED;
-		memoryBarrier.newLayout           = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
-
-		memoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-		memoryBarrier.subresourceRange.levelCount = 1;
-		memoryBarrier.subresourceRange.layerCount = 1;
-
-		VkDependencyInfo dependencyInfo{};
-		dependencyInfo.sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-		dependencyInfo.pNext                   = nullptr;
-		dependencyInfo.imageMemoryBarrierCount = 1;
-		dependencyInfo.pImageMemoryBarriers    = &memoryBarrier;
-		m_Context.DispatchTable.cmdPipelineBarrier2(commandBuffer, &dependencyInfo);
+		Image::Transition transition{};
+		//
+		{
+			transition.SrcAccessMask = VK_ACCESS_2_NONE;
+			transition.DstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			transition.SrcStageMask  = VK_PIPELINE_STAGE_2_NONE;
+			transition.DstStageMask  = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT;
+			transition.NewLayout     = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+		}
+		m_DepthImage->MakeTransition(m_Context, commandBuffer, transition);
 	}
 
 	VkRenderingAttachmentInfo renderingAttachmentInfo{};
 	renderingAttachmentInfo.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
 	renderingAttachmentInfo.clearValue  = { { .03f, .03f, .03f, 1.f } };
 	renderingAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-	renderingAttachmentInfo.imageView   = m_Context.SwapchainImageViews[imageIndex];
+	renderingAttachmentInfo.imageView   = m_SwapchainImageViews[imageIndex];
 	renderingAttachmentInfo.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	renderingAttachmentInfo.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
 
@@ -659,28 +623,16 @@ void App::RecordCommandBuffer(VkCommandBuffer const& commandBuffer, size_t image
 
 	// swapchain image to present
 	{
-		VkImageMemoryBarrier2 memoryBarrier{};
-		memoryBarrier.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-		memoryBarrier.image               = m_Context.SwapchainImages[imageIndex];
-		memoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		memoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		memoryBarrier.srcAccessMask       = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-		memoryBarrier.dstAccessMask       = VK_ACCESS_2_NONE;
-		memoryBarrier.srcStageMask        = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-		memoryBarrier.dstStageMask        = VK_PIPELINE_STAGE_2_NONE;
-		memoryBarrier.oldLayout           = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		memoryBarrier.newLayout           = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-		memoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		memoryBarrier.subresourceRange.levelCount = 1;
-		memoryBarrier.subresourceRange.layerCount = 1;
-
-		VkDependencyInfo dependencyInfo{};
-		dependencyInfo.sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-		dependencyInfo.pNext                   = nullptr;
-		dependencyInfo.imageMemoryBarrierCount = 1;
-		dependencyInfo.pImageMemoryBarriers    = &memoryBarrier;
-		m_Context.DispatchTable.cmdPipelineBarrier2(commandBuffer, &dependencyInfo);
+		Image::Transition transition{};
+		//
+		{
+			transition.SrcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+			transition.DstAccessMask = VK_ACCESS_2_NONE;
+			transition.SrcStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+			transition.DstStageMask  = VK_PIPELINE_STAGE_2_NONE;
+			transition.NewLayout     = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		}
+		swapchainImage.MakeTransition(m_Context, commandBuffer, transition);
 	}
 	m_Context.DispatchTable.endCommandBuffer(commandBuffer);
 }

@@ -41,7 +41,7 @@ private:
 	void CreateDescriptorSetLayouts();
 	void CreateResources();
 	void CreateCommandBuffers();
-	void RecordCommandBuffer(VkCommandBuffer const& commandBuffer, size_t imageIndex) const;
+	void RecordCommandBuffer(VkCommandBuffer commandBuffer, size_t imageIndex) const;
 	void Submit() const;
 	void Present(uint32_t imageIndex) const;
 	void End();
@@ -58,6 +58,9 @@ private:
 	VkFormat        m_DepthFormat{};
 	uptr<Image>     m_DepthImage{};
 	uptr<ImageView> m_DepthImageView{};
+
+	std::vector<Image>     m_SwapchainImages;
+	std::vector<ImageView> m_SwapchainImageViews;
 
 	std::vector<VkCommandBuffer> m_CommandBuffers{};
 

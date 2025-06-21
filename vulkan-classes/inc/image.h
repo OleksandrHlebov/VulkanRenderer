@@ -16,9 +16,47 @@ public:
 
 	ImageView CreateView
 	(
-		Context&   context, VkImageViewType type, uint32_t baseLayer = 0, uint32_t layerCount = 1, uint32_t baseMipLevel = 0
-		, uint32_t levelCount                                        = 1
+		Context&          context
+		, VkImageViewType type
+		, uint32_t        baseLayer    = 0
+		, uint32_t        layerCount   = 1
+		, uint32_t        baseMipLevel = 0
+		, uint32_t        levelCount   = 1
 	) const;
+
+	struct Transition
+	{
+		VkAccessFlags2       SrcAccessMask{};
+		VkAccessFlags2       DstAccessMask{};
+		VkPipelineStageFlags SrcStageMask{};
+		VkPipelineStageFlags DstStageMask{};
+		VkImageLayout        NewLayout{};
+
+		uint32_t BaseLayer{ 0 };
+		uint32_t LayerCount{ 1 };
+		uint32_t BaseMipLevel{ 0 };
+		uint32_t LevelCount{ 1 };
+
+		uint32_t SrcQueue{ VK_QUEUE_FAMILY_IGNORED };
+		uint32_t DstQueue{ VK_QUEUE_FAMILY_IGNORED };
+	};
+
+	void MakeTransition(Context const& context, VkCommandBuffer commandBuffer, Transition const& transition) const;
+
+	[[nodiscard]] VkImageLayout GetLayout(uint32_t mipLevel, uint32_t layer) const
+	{
+		assert(mipLevel < m_MipLevels && layer < m_Layers);
+
+		return m_Layouts[mipLevel][layer];
+	}
+
+	[[nodiscard]] VmaAllocation GetAllocation() const
+	{
+		return m_Allocation;
+	}
+
+	static void ConvertFromSwapchainVkImages
+	(Context& context, std::vector<Image>& convertedImages);
 
 	operator VkImage() const
 	{
@@ -35,26 +73,19 @@ public:
 		return &m_Image;
 	}
 
-	[[nodiscard]] VkImageLayout GetLayout() const
-	{
-		return m_Layout;
-	}
-
-	[[nodiscard]] VmaAllocation GetAllocation() const
-	{
-		return m_Allocation;
-	}
-
 private:
 	friend class ImageBuilder;
 	Image() = default;
+	using Layers    = std::vector<VkImageLayout>;
+	using MipLevels = std::vector<Layers>;
 	VkImage            m_Image{};
-	VkImageLayout      m_Layout{};
+	MipLevels          m_Layouts{};
 	VmaAllocation      m_Allocation{};
 	VkExtent2D         m_Extent{};
 	VkFormat           m_Format{};
 	VkImageAspectFlags m_AspectFlags{};
 	uint32_t           m_Layers{};
+	uint32_t           m_MipLevels{};
 };
 
 class ImageBuilder final
@@ -74,6 +105,7 @@ public:
 	ImageBuilder& SetTiling(VkImageTiling tiling);
 	ImageBuilder& SetAspectFlags(VkImageAspectFlags aspectFlags);
 	ImageBuilder& SetLayers(uint32_t layers);
+	ImageBuilder& SetMipLevels(uint32_t mipLevels);
 	ImageBuilder& SetType(VkImageType type);
 	ImageBuilder& SetExtent(VkExtent2D extent);
 	ImageBuilder& SetMemoryUsage(VmaMemoryUsage memoryUsage);
@@ -93,6 +125,7 @@ private:
 	VkImageAspectFlags m_AspectFlags{ VK_IMAGE_ASPECT_COLOR_BIT };
 	VmaMemoryUsage     m_MemoryUsage{ VMA_MEMORY_USAGE_AUTO };
 	uint32_t           m_Layers{ 1 };
+	uint32_t           m_MipLevels{ 1 };
 
 	std::string m_FileName;
 };

@@ -8,7 +8,7 @@ ImageView Image::CreateView
 	VkImageViewCreateInfo imageViewCreateInfo{};
 	imageViewCreateInfo.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	imageViewCreateInfo.flags                           = 0;
-	imageViewCreateInfo.image                           = m_Image;
+	imageViewCreateInfo.image                           = *this;
 	imageViewCreateInfo.viewType                        = type;
 	imageViewCreateInfo.format                          = m_Format;
 	imageViewCreateInfo.subresourceRange.aspectMask     = m_AspectFlags;
@@ -26,6 +26,55 @@ ImageView Image::CreateView
 	});
 
 	return imageView;
+}
+
+void Image::MakeTransition(Context const& context, VkCommandBuffer commandBuffer, Transition const& transition) const
+{
+	VkImageMemoryBarrier2 memoryBarrier{};
+	memoryBarrier.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+	memoryBarrier.image               = *this;
+	memoryBarrier.srcQueueFamilyIndex = transition.SrcQueue;
+	memoryBarrier.dstQueueFamilyIndex = transition.DstQueue;
+	memoryBarrier.srcAccessMask       = transition.SrcAccessMask;
+	memoryBarrier.dstAccessMask       = transition.DstAccessMask;
+	memoryBarrier.srcStageMask        = transition.SrcStageMask;
+	memoryBarrier.dstStageMask        = transition.DstStageMask;
+	memoryBarrier.oldLayout           = m_Layouts[transition.BaseMipLevel][transition.BaseLayer];
+	memoryBarrier.newLayout           = transition.NewLayout;
+
+	memoryBarrier.subresourceRange.aspectMask     = m_AspectFlags;
+	memoryBarrier.subresourceRange.layerCount     = transition.LayerCount;
+	memoryBarrier.subresourceRange.baseArrayLayer = transition.BaseLayer;
+	memoryBarrier.subresourceRange.levelCount     = transition.LevelCount;
+	memoryBarrier.subresourceRange.baseMipLevel   = transition.BaseMipLevel;
+
+	VkDependencyInfo dependencyInfo{};
+	dependencyInfo.sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+	dependencyInfo.pNext                   = nullptr;
+	dependencyInfo.imageMemoryBarrierCount = 1;
+	dependencyInfo.pImageMemoryBarriers    = &memoryBarrier;
+	context.DispatchTable.cmdPipelineBarrier2(commandBuffer, &dependencyInfo);
+}
+
+void Image::ConvertFromSwapchainVkImages(Context& context, std::vector<Image>& convertedImages)
+{
+	convertedImages.reserve(context.Swapchain.image_count);
+	auto const resultImages = context.Swapchain.get_images();
+	if (!resultImages)
+		throw std::runtime_error("Failed to get swapchain images " + resultImages.error().message());
+	for (VkImage const& image: resultImages.value())
+	{
+		Image convertedImage{};
+		convertedImage.m_Image       = image;
+		convertedImage.m_Extent      = context.Swapchain.extent;
+		convertedImage.m_Format      = context.Swapchain.image_format;
+		convertedImage.m_AspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
+		convertedImage.m_MipLevels   = 1;
+		convertedImage.m_Layers      = 1;
+		convertedImage.m_Layouts.resize(1);
+		convertedImage.m_Layouts[0].resize(1);
+		convertedImages.emplace_back(std::move(convertedImage));
+	}
 }
 
 ImageBuilder& ImageBuilder::SetFormat(VkFormat format)
@@ -49,6 +98,12 @@ ImageBuilder& ImageBuilder::SetAspectFlags(VkImageAspectFlags aspectFlags)
 ImageBuilder& ImageBuilder::SetLayers(uint32_t layers)
 {
 	m_Layers = layers;
+	return *this;
+}
+
+ImageBuilder& ImageBuilder::SetMipLevels(uint32_t mipLevels)
+{
+	m_MipLevels = mipLevels;
 	return *this;
 }
 
@@ -109,7 +164,10 @@ Image ImageBuilder::Build(VkImageUsageFlags usage) const
 	image.m_Extent      = m_Extent;
 	image.m_Format      = m_Format;
 	image.m_Layers      = m_Layers;
-	image.m_Layout      = VK_IMAGE_LAYOUT_UNDEFINED;
+	image.m_MipLevels   = m_MipLevels;
+	image.m_Layouts.resize(m_MipLevels);
+	for (auto& layers: image.m_Layouts)
+		layers.resize(m_Layers, VK_IMAGE_LAYOUT_UNDEFINED);
 
 	vmaCreateImage(m_Context.Allocator, &createInfo, &vmaAllocationCreateInfo, image, &image.m_Allocation, nullptr);
 
