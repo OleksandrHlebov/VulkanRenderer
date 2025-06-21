@@ -28,7 +28,7 @@ ImageView Image::CreateView
 	return imageView;
 }
 
-void Image::MakeTransition(Context const& context, VkCommandBuffer commandBuffer, Transition const& transition) const
+void Image::MakeTransition(Context const& context, VkCommandBuffer commandBuffer, Transition const& transition)
 {
 	VkImageMemoryBarrier2 memoryBarrier{};
 	memoryBarrier.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -54,6 +54,10 @@ void Image::MakeTransition(Context const& context, VkCommandBuffer commandBuffer
 	dependencyInfo.imageMemoryBarrierCount = 1;
 	dependencyInfo.pImageMemoryBarriers    = &memoryBarrier;
 	context.DispatchTable.cmdPipelineBarrier2(commandBuffer, &dependencyInfo);
+
+	for (uint32_t mipLevel{}; mipLevel < transition.LevelCount; ++mipLevel)
+		for (uint32_t layer{}; layer < transition.LayerCount; ++layer)
+			m_Layouts[transition.BaseMipLevel + mipLevel][transition.BaseLayer + layer] = transition.NewLayout;
 }
 
 void Image::ConvertFromSwapchainVkImages(Context& context, std::vector<Image>& convertedImages)

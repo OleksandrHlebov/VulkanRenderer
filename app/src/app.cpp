@@ -536,12 +536,12 @@ void App::CreateCommandBuffers()
 	});
 }
 
-void App::RecordCommandBuffer(VkCommandBuffer commandBuffer, size_t imageIndex) const
+void App::RecordCommandBuffer(VkCommandBuffer commandBuffer, size_t imageIndex)
 {
 	VkCommandBufferBeginInfo beginInfo{};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	m_Context.DispatchTable.beginCommandBuffer(commandBuffer, &beginInfo);
-	Image const& swapchainImage = m_SwapchainImages[imageIndex];
+	Image& swapchainImage = m_SwapchainImages[imageIndex];
 	// swapchain image to attachment optimal
 	{
 		Image::Transition transition{};

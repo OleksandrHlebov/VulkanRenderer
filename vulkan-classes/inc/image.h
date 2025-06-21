@@ -43,7 +43,7 @@ public:
 		uint32_t DstQueue{ VK_QUEUE_FAMILY_IGNORED };
 	};
 
-	void MakeTransition(Context const& context, VkCommandBuffer commandBuffer, Transition const& transition) const;
+	void MakeTransition(Context const& context, VkCommandBuffer commandBuffer, Transition const& transition);
 
 	[[nodiscard]] VkImageLayout GetLayout(uint32_t mipLevel = 0, uint32_t layer = 0) const
 	{

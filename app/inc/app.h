@@ -41,7 +41,7 @@ private:
 	void CreateDescriptorSetLayouts();
 	void CreateResources();
 	void CreateCommandBuffers();
-	void RecordCommandBuffer(VkCommandBuffer commandBuffer, size_t imageIndex) const;
+	void RecordCommandBuffer(VkCommandBuffer commandBuffer, size_t imageIndex);
 	void Submit() const;
 	void Present(uint32_t imageIndex) const;
 	void End();
