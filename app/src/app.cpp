@@ -428,7 +428,7 @@ void App::CreateGraphicsPipeline()
 	pipelineCreateInfo.pDynamicState       = &pipelineDynamicState;
 	pipelineCreateInfo.pDepthStencilState  = &depthStencilState;
 	pipelineCreateInfo.renderPass          = VK_NULL_HANDLE;
-	pipelineCreateInfo.layout              = m_PipelineLayout;
+	pipelineCreateInfo.layout              = *m_PipelineLayout;
 
 	if (m_Context.DispatchTable.createGraphicsPipelines(VK_NULL_HANDLE
 														, 1
@@ -594,7 +594,7 @@ void App::RecordCommandBuffer(VkCommandBuffer commandBuffer, size_t imageIndex)
 		m_Context.DispatchTable.cmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
 		m_Context.DispatchTable.cmdBindDescriptorSets(commandBuffer
 													  , VK_PIPELINE_BIND_POINT_GRAPHICS
-													  , m_PipelineLayout
+													  , *m_PipelineLayout
 													  , 0
 													  , 1
 													  , &m_FrameDescriptorSets[m_CurrentFrame]
