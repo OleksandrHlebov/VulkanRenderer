@@ -13,7 +13,9 @@ set(INCLUDE
 set(SOURCE
     src/main.cpp
     src/vma_usage.cpp
-    src/image.cpp)
+    src/image.cpp
+    src/buffer.cpp
+    src/image_view.cpp)
 
 add_library(VulkanClasses STATIC
             ${SOURCE}
