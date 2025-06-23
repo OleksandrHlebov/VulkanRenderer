@@ -6,8 +6,10 @@
 #include "context.h"
 #include "camera.h"
 #include "image.h"
-#include "pipeline_layout.h"
 #include "VkBootstrap.h"
+
+class Pipeline;
+class PipelineLayout;
 
 class App final
 {
@@ -16,7 +18,7 @@ public:
 	using uptr = std::unique_ptr<T>;
 
 	App(int width, int height);
-	~App() = default;
+	~App();
 
 	App(App&&)                 = delete;
 	App(App const&)            = delete;
@@ -54,7 +56,7 @@ private:
 	VkDescriptorPool      m_DescPool{};
 
 	uptr<PipelineLayout> m_PipelineLayout;
-	VkPipeline           m_Pipeline{};
+	uptr<Pipeline>       m_Pipeline{};
 
 	VkFormat        m_DepthFormat{};
 	uptr<Image>     m_DepthImage{};

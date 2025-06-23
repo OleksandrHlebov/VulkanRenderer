@@ -28,7 +28,6 @@ set(SHADER_SOURCES
 
 set(HEADER
     inc/helper.h
-    ../vulkan-classes/inc/deletion_queue.h
     inc/camera.h
     inc/world_time.h)
 

@@ -3,6 +3,7 @@
 #include "datatypes.h"
 #include "helper.h"
 #include "image.h"
+#include "pipeline.h"
 #include "vma_usage.h"
 
 App::App(int width, int height)
@@ -28,6 +29,8 @@ App::App(int width, int height)
 	CreateDescriptorSets();
 	CreateCommandBuffers();
 }
+
+App::~App() = default;
 
 void App::Run()
 {
@@ -318,130 +321,27 @@ void App::CreateGraphicsPipeline()
 		m_PipelineLayout = std::make_unique<PipelineLayout>(std::move(layout));
 	}
 
-	VkPipelineVertexInputStateCreateInfo vertexInputState{};
-	vertexInputState.sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertexInputState.vertexBindingDescriptionCount   = 0;
-	vertexInputState.vertexAttributeDescriptionCount = 0;
-
-	VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
-	inputAssembly.sType                  = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-	inputAssembly.topology               = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	inputAssembly.primitiveRestartEnable = VK_FALSE;
-
-	VkViewport viewport{};
-	viewport.x        = 0.0f;
-	viewport.y        = 0.0f;
-	viewport.width    = static_cast<float>(m_Context.Swapchain.extent.width);
-	viewport.height   = static_cast<float>(m_Context.Swapchain.extent.height);
-	viewport.minDepth = 0.0f;
-	viewport.maxDepth = 1.0f;
-
-	VkRect2D scissor{};
-	scissor.extent = m_Context.Swapchain.extent;
-	scissor.offset = { 0, 0 };
-
-	VkPipelineViewportStateCreateInfo viewportState{};
-	viewportState.sType         = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-	viewportState.viewportCount = 1;
-	viewportState.pViewports    = &viewport;
-	viewportState.scissorCount  = 1;
-	viewportState.pScissors     = &scissor;
-
-	VkPipelineRasterizationStateCreateInfo rasterizer{};
-	rasterizer.sType                   = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-	rasterizer.depthClampEnable        = VK_FALSE;
-	rasterizer.rasterizerDiscardEnable = VK_FALSE;
-	rasterizer.polygonMode             = VK_POLYGON_MODE_FILL;
-	rasterizer.lineWidth               = 1.0f;
-	rasterizer.cullMode                = VK_CULL_MODE_BACK_BIT;
-	rasterizer.frontFace               = VK_FRONT_FACE_CLOCKWISE;
-	rasterizer.depthBiasEnable         = VK_FALSE;
-
-	VkPipelineMultisampleStateCreateInfo multisampleState{};
-	multisampleState.sType                = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-	multisampleState.sampleShadingEnable  = VK_FALSE;
-	multisampleState.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-
-	VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-	colorBlendAttachment.colorWriteMask =
-		VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-		VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	colorBlendAttachment.blendEnable = VK_FALSE;
-
-	VkPipelineColorBlendStateCreateInfo colorBlendState{};
-	colorBlendState.sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-	colorBlendState.logicOpEnable   = VK_FALSE;
-	colorBlendState.attachmentCount = 1;
-	colorBlendState.pAttachments    = &colorBlendAttachment;
-
-	VkDynamicState dynamicState[]{ VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
-
-	VkPipelineDynamicStateCreateInfo pipelineDynamicState{};
-	pipelineDynamicState.sType             = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-	pipelineDynamicState.dynamicStateCount = static_cast<uint32_t>(std::size(dynamicState));
-	pipelineDynamicState.pDynamicStates    = dynamicState;
+	VkShaderModule const vert = CreateShaderModule(help::ReadFile("shaders/basic_transform.spv"));
+	VkShaderModule const frag = CreateShaderModule(help::ReadFile("shaders/basic_color.spv"));
 
 	VkFormat colorAttachmentFormats[]{ m_Context.Swapchain.image_format };
 
-	VkPipelineRenderingCreateInfo pipelineRendering{};
-	pipelineRendering.sType                   = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-	pipelineRendering.colorAttachmentCount    = static_cast<uint32_t>(std::size(colorAttachmentFormats));
-	pipelineRendering.pColorAttachmentFormats = colorAttachmentFormats;
-	pipelineRendering.depthAttachmentFormat   = m_DepthFormat;
-
-	VkPipelineDepthStencilStateCreateInfo depthStencilState{};
-	depthStencilState.sType                 = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-	depthStencilState.depthTestEnable       = VK_TRUE;
-	depthStencilState.depthWriteEnable      = VK_TRUE;
-	depthStencilState.depthCompareOp        = VK_COMPARE_OP_LESS_OR_EQUAL;
-	depthStencilState.depthBoundsTestEnable = VK_FALSE;
-	depthStencilState.stencilTestEnable     = VK_FALSE;
-
-	VkShaderModule vert = CreateShaderModule(help::ReadFile("shaders/basic_transform.spv"));
-	VkShaderModule frag = CreateShaderModule(help::ReadFile("shaders/basic_color.spv"));
-
-	VkPipelineShaderStageCreateInfo vertStage{};
-	vertStage.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	vertStage.pName  = "main";
-	vertStage.stage  = VK_SHADER_STAGE_VERTEX_BIT;
-	vertStage.module = vert;
-
-	VkPipelineShaderStageCreateInfo fragStage{};
-	fragStage.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	fragStage.pName  = "main";
-	fragStage.stage  = VK_SHADER_STAGE_FRAGMENT_BIT;
-	fragStage.module = frag;
-
-	VkPipelineShaderStageCreateInfo shaderStage[]{ vertStage, fragStage };
-
-	VkGraphicsPipelineCreateInfo pipelineCreateInfo{};
-	pipelineCreateInfo.sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	pipelineCreateInfo.pNext               = &pipelineRendering;
-	pipelineCreateInfo.stageCount          = 2;
-	pipelineCreateInfo.pStages             = shaderStage;
-	pipelineCreateInfo.pVertexInputState   = &vertexInputState;
-	pipelineCreateInfo.pInputAssemblyState = &inputAssembly;
-	pipelineCreateInfo.pViewportState      = &viewportState;
-	pipelineCreateInfo.pRasterizationState = &rasterizer;
-	pipelineCreateInfo.pMultisampleState   = &multisampleState;
-	pipelineCreateInfo.pColorBlendState    = &colorBlendState;
-	pipelineCreateInfo.pDynamicState       = &pipelineDynamicState;
-	pipelineCreateInfo.pDepthStencilState  = &depthStencilState;
-	pipelineCreateInfo.renderPass          = VK_NULL_HANDLE;
-	pipelineCreateInfo.layout              = *m_PipelineLayout;
-
-	if (m_Context.DispatchTable.createGraphicsPipelines(VK_NULL_HANDLE
-														, 1
-														, &pipelineCreateInfo
-														, nullptr
-														, &m_Pipeline) != VK_SUCCESS)
-		throw std::runtime_error("failed to create graphics pipeline");
-
-	m_Context.DeletionQueue.
-			  Push([this]
-			  {
-				  m_Context.DispatchTable.destroyPipeline(m_Pipeline, nullptr);
-			  });
+	PipelineBuilder builder{ m_Context };
+	Pipeline        pipeline = builder
+						.SetTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+						.AddViewport(m_Context.Swapchain.extent)
+						.SetPolygonMode(VK_POLYGON_MODE_FILL)
+						.SetCullMode(VK_CULL_MODE_BACK_BIT)
+						.SetFrontFace(VK_FRONT_FACE_CLOCKWISE)
+						.AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT)
+						.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR)
+						.SetRenderingAttachments(colorAttachmentFormats, m_DepthFormat, VK_FORMAT_UNDEFINED)
+						.EnableDepthTest(VK_COMPARE_OP_LESS_OR_EQUAL)
+						.EnableDepthWrite()
+						.AddShaderStage(vert, VK_SHADER_STAGE_VERTEX_BIT)
+						.AddShaderStage(frag, VK_SHADER_STAGE_FRAGMENT_BIT)
+						.Build(*m_PipelineLayout);
+	m_Pipeline = std::make_unique<Pipeline>(std::move(pipeline));
 
 	m_Context.DispatchTable.destroyShaderModule(vert, nullptr);
 	m_Context.DispatchTable.destroyShaderModule(frag, nullptr);
@@ -502,7 +402,8 @@ void App::CreateResources()
 					  .SetExtent(m_Context.Swapchain.extent)
 					  .SetFormat(m_DepthFormat)
 					  .SetType(VK_IMAGE_TYPE_2D)
-					  .SetAspectFlags(VK_IMAGE_ASPECT_DEPTH_BIT | help::HasStencilComponent(m_DepthFormat) * VK_IMAGE_ASPECT_STENCIL_BIT)
+					  .SetAspectFlags(VK_IMAGE_ASPECT_DEPTH_BIT | help::HasStencilComponent(m_DepthFormat) *
+									  VK_IMAGE_ASPECT_STENCIL_BIT)
 					  .Build(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
 		m_DepthImage = std::make_unique<Image>(std::move(image));
 
@@ -591,7 +492,7 @@ void App::RecordCommandBuffer(VkCommandBuffer commandBuffer, size_t imageIndex)
 	m_Context.DispatchTable.cmdBeginRendering(commandBuffer, &renderingInfo);
 	// main pass
 	{
-		m_Context.DispatchTable.cmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
+		m_Context.DispatchTable.cmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *m_Pipeline);
 		m_Context.DispatchTable.cmdBindDescriptorSets(commandBuffer
 													  , VK_PIPELINE_BIND_POINT_GRAPHICS
 													  , *m_PipelineLayout
