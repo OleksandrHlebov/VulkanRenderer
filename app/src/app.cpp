@@ -309,6 +309,15 @@ void App::CreateDescriptorSets()
 
 void App::CreateGraphicsPipeline()
 {
+	// default layout
+	{
+		PipelineLayoutBuilder builder{ m_Context };
+		PipelineLayout        layout = builder
+								.AddDescriptorSetLayout(m_FrameDescSetLayout)
+								.Build();
+		m_PipelineLayout = std::make_unique<PipelineLayout>(std::move(layout));
+	}
+
 	VkPipelineVertexInputStateCreateInfo vertexInputState{};
 	vertexInputState.sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 	vertexInputState.vertexBindingDescriptionCount   = 0;
@@ -364,20 +373,6 @@ void App::CreateGraphicsPipeline()
 	colorBlendState.logicOpEnable   = VK_FALSE;
 	colorBlendState.attachmentCount = 1;
 	colorBlendState.pAttachments    = &colorBlendAttachment;
-
-	VkPipelineLayoutCreateInfo pipelineLayout{};
-	pipelineLayout.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pipelineLayout.setLayoutCount         = 1;
-	pipelineLayout.pSetLayouts            = &m_FrameDescSetLayout;
-	pipelineLayout.pushConstantRangeCount = 0;
-
-	if (m_Context.DispatchTable.createPipelineLayout(&pipelineLayout, nullptr, &m_PipelineLayout) != VK_SUCCESS)
-		throw std::runtime_error("Failed to create pipeline layout");
-
-	m_Context.DeletionQueue.Push([this]
-	{
-		m_Context.DispatchTable.destroyPipelineLayout(m_PipelineLayout, nullptr);
-	});
 
 	VkDynamicState dynamicState[]{ VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 

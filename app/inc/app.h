@@ -6,6 +6,7 @@
 #include "context.h"
 #include "camera.h"
 #include "image.h"
+#include "pipeline_layout.h"
 #include "VkBootstrap.h"
 
 class App final
@@ -46,14 +47,14 @@ private:
 	void Present(uint32_t imageIndex) const;
 	void End();
 
-	std::unique_ptr<Camera> m_Camera;
-	Context                 m_Context{};
+	uptr<Camera> m_Camera;
+	Context      m_Context{};
 
 	VkDescriptorSetLayout m_FrameDescSetLayout{};
 	VkDescriptorPool      m_DescPool{};
 
-	VkPipelineLayout m_PipelineLayout{};
-	VkPipeline       m_Pipeline{};
+	uptr<PipelineLayout> m_PipelineLayout;
+	VkPipeline           m_Pipeline{};
 
 	VkFormat        m_DepthFormat{};
 	uptr<Image>     m_DepthImage{};

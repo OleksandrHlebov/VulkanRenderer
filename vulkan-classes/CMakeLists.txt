@@ -8,14 +8,16 @@ set(INCLUDE
     inc/image.h
     inc/datatypes.h
     inc/Buffer.h
-    inc/image_view.h)
+    inc/image_view.h
+    inc/pipeline_layout.h)
 
 set(SOURCE
     src/main.cpp
     src/vma_usage.cpp
     src/image.cpp
     src/buffer.cpp
-    src/image_view.cpp)
+    src/image_view.cpp
+    src/pipeline_layout.cpp)
 
 add_library(VulkanClasses STATIC
             ${SOURCE}
