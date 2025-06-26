@@ -28,7 +28,11 @@ jobs:
          vulkan-query-version: 1.3.275.0
          vulkan-components: Vulkan-Headers, Vulkan-Loader
          vulkan-use-cache: true
-
+         
+    - name: Verify glslc is available
+      shell: cmd
+      run: glslc --version
+      
     - name: Setup MSVC environment
       if: matrix.compiler == 'msvc'
       uses: ilammy/msvc-dev-cmd@v1
