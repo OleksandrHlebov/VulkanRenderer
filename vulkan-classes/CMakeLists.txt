@@ -24,7 +24,9 @@ set(SOURCE
     src/pipeline_layout.cpp
     src/pipeline.cpp
     src/descriptor_set_layout.cpp
-    src/descriptor_pool.cpp)
+    src/descriptor_pool.cpp
+    inc/descriptor_set.h
+    src/descriptor_set.cpp)
 
 add_library(VulkanClasses STATIC
             ${SOURCE}

@@ -5,6 +5,7 @@
 #include "buffer.h"
 #include "context.h"
 #include "camera.h"
+#include "descriptor_set.h"
 #include "VkBootstrap.h"
 
 class DescriptorPool;
@@ -72,7 +73,7 @@ private:
 
 	std::vector<Buffer> m_MVPUBOs{};
 
-	std::vector<VkDescriptorSet> m_FrameDescriptorSets{};
+	std::vector<DescriptorSet> m_FrameDescriptorSets{};
 
 	std::vector<VkSemaphore> m_ImageAvailableSemaphores{};
 	std::vector<VkSemaphore> m_RenderFinishedSemaphores{};

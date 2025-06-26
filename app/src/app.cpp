@@ -268,18 +268,10 @@ void App::CreateDescriptorPool()
 
 void App::CreateDescriptorSets()
 {
-	std::vector<VkDescriptorSetLayout> const layouts(m_FramesInFlight, *m_FrameDescSetLayout);
+	std::vector<VkDescriptorSetLayout> layouts(m_FramesInFlight, *m_FrameDescSetLayout);
 
-	VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{};
-	descriptorSetAllocateInfo.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	descriptorSetAllocateInfo.descriptorPool     = *m_DescPool;
-	descriptorSetAllocateInfo.descriptorSetCount = m_FramesInFlight;
-	descriptorSetAllocateInfo.pSetLayouts        = layouts.data();
-
-	m_FrameDescriptorSets.resize(m_FramesInFlight);
-	if (auto const result = m_Context.DispatchTable.allocateDescriptorSets(&descriptorSetAllocateInfo, m_FrameDescriptorSets.data());
-		result != VK_SUCCESS)
-		throw std::runtime_error("Failed to allocate descriptor sets");
+	DescriptorSetBuilder const builder{ m_Context };
+	m_FrameDescriptorSets = builder.Build(*m_DescPool, layouts);
 
 	for (uint32_t index{}; index < m_FramesInFlight; ++index)
 	{
@@ -288,15 +280,11 @@ void App::CreateDescriptorSets()
 		bufferInfo.range  = VK_WHOLE_SIZE;
 		bufferInfo.offset = 0;
 
-		VkWriteDescriptorSet writeDescriptorSet{};
-		writeDescriptorSet.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writeDescriptorSet.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		writeDescriptorSet.dstSet          = m_FrameDescriptorSets[index];
-		writeDescriptorSet.dstBinding      = 0;
-		writeDescriptorSet.dstArrayElement = 0;
-		writeDescriptorSet.descriptorCount = 1;
-		writeDescriptorSet.pBufferInfo     = &bufferInfo;
-		m_Context.DispatchTable.updateDescriptorSets(1, &writeDescriptorSet, 0, nullptr);
+		VkDescriptorBufferInfo infos[]{ bufferInfo };
+
+		m_FrameDescriptorSets[index]
+			.AddWriteDescriptor(infos, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, 0)
+			.Update(m_Context);
 	}
 }
 
@@ -475,7 +463,7 @@ void App::RecordCommandBuffer(VkCommandBuffer commandBuffer, size_t imageIndex)
 													  , *m_PipelineLayout
 													  , 0
 													  , 1
-													  , &m_FrameDescriptorSets[m_CurrentFrame]
+													  , m_FrameDescriptorSets[m_CurrentFrame]
 													  , 0
 													  , nullptr);
 
