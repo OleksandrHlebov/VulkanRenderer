@@ -24,7 +24,7 @@ jobs:
 
     # Setup Vulkan SDK using the install-vulkan-sdk action by humbletim
     - name: Install Vulkan SDK
-      uses: humbletim/install-vulkan-sdk@v9202b1b
+      uses: humbletim/setup-vulkan-sdk@v1.2.1
       with:
         version: ${{ env.VULKAN_SDK_VERSION }}
         cache: true
