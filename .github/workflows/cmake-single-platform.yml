@@ -18,6 +18,7 @@ jobs:
     env:
       BUILD_TYPE: ${{ matrix.build_type }}
       VULKAN_VERSION: 1.3.275.0
+      VULKAN_SDK_DIR: C:\VulkanSDK\1.3.275.0
 
     steps:
     - uses: actions/checkout@v4
@@ -35,23 +36,23 @@ jobs:
       id: cache-vulkan
       uses: actions/cache@v4
       with:
-        path: C:\VulkanSDK\${{ env.VULKAN_VERSION }}
+        path: ${{ env.VULKAN_SDK_DIR }}
         key: vulkan-sdk-${{ env.VULKAN_VERSION }}
 
-    - name: Install Vulkan SDK
+    - name: Download and Extract Vulkan SDK
       if: steps.cache-vulkan.outputs.cache-hit != 'true'
       shell: powershell
       run: |
-        $ErrorActionPreference = "Stop"
-        $VulkanInstallerUrl = "https://sdk.lunarg.com/sdk/download/${{ env.VULKAN_VERSION }}/windows/VulkanSDK-${{ env.VULKAN_VERSION }}-Installer.exe?Human=true"
-        Invoke-WebRequest -Uri $VulkanInstallerUrl -OutFile "VulkanSDKInstaller.exe"
-        Start-Process .\VulkanSDKInstaller.exe -ArgumentList "/S" -Wait
+        $version = "${{ env.VULKAN_VERSION }}"
+        $zipUrl = "https://sdk.lunarg.com/sdk/download/$version/windows/VulkanSDK-$version-windows.zip"
+        Invoke-WebRequest $zipUrl -OutFile vulkan-sdk.zip
+        Expand-Archive vulkan-sdk.zip -DestinationPath "C:\VulkanSDK"
 
     - name: Set Vulkan Env Vars
       shell: powershell
       run: |
-        echo "VULKAN_SDK=C:\VulkanSDK\${{ env.VULKAN_VERSION }}" >> $env:GITHUB_ENV
-        echo "C:\VulkanSDK\${{ env.VULKAN_VERSION }}\Bin" >> $env:GITHUB_PATH
+        echo "VULKAN_SDK=${{ env.VULKAN_SDK_DIR }}" >> $env:GITHUB_ENV
+        echo "${{ env.VULKAN_SDK_DIR }}\Bin" >> $env:GITHUB_PATH
 
     - name: Configure CMake
       run: >
