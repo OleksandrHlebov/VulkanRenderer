@@ -3,7 +3,6 @@
 #include "deletion_queue.h"
 
 #include "VkBootstrap.h"
-#include "vulkan/vulkan.h"
 #include "vma_usage.h"
 
 #include "GLFW/glfw3.h"

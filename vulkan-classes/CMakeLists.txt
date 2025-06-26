@@ -11,7 +11,8 @@ set(INCLUDE
     inc/Buffer.h
     inc/image_view.h
     inc/pipeline_layout.h
-    inc/pipeline.h)
+    inc/pipeline.h
+    inc/descriptor_set_layout.h)
 
 set(SOURCE
     src/main.cpp
@@ -20,7 +21,8 @@ set(SOURCE
     src/buffer.cpp
     src/image_view.cpp
     src/pipeline_layout.cpp
-    src/pipeline.cpp)
+    src/pipeline.cpp
+    src/descriptor_set_layout.cpp)
 
 add_library(VulkanClasses STATIC
             ${SOURCE}

@@ -1,9 +1,9 @@
 #ifndef CAMERA_H
 #define CAMERA_H
 #include <algorithm>
+#include <cfloat>
 
 #include "world_time.h"
-#include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 
 class Camera final

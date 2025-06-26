@@ -2,7 +2,6 @@
 #define BUFFER_H
 
 #include "context.h"
-#include "vma_usage.h"
 
 class Buffer final
 {

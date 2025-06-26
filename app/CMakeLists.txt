@@ -51,7 +51,7 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 
 target_link_libraries(${PROJECT_NAME} PUBLIC
                       VulkanClasses
-                      glm::glm-header-only)
+                      glm::glm)
 
 foreach (shader IN LISTS SHADER_SOURCES)
 	Shader_Compile(${shader})

@@ -1,7 +1,6 @@
 
 #ifndef PIPELINE_LAYOUT_H
 #define PIPELINE_LAYOUT_H
-#include <vulkan/vulkan_core.h>
 
 #include "context.h"
 

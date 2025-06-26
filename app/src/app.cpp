@@ -1,14 +1,14 @@
 #include "app.h"
 
 #include "datatypes.h"
+#include "descriptor_set_layout.h"
 #include "helper.h"
 #include "image.h"
 #include "pipeline.h"
-#include "vma_usage.h"
 
 App::App(int width, int height)
 {
-	m_Camera = std::make_unique<Camera>(glm::vec3{ .0f, .0f, .0f }
+	m_Camera = std::make_unique<Camera>(glm::vec3(.0f, .0f, .0f)
 										, 45.f
 										, static_cast<float>(width) / height // NOLINT(*-narrowing-conversions)
 										, .0f
@@ -278,13 +278,13 @@ void App::CreateDescriptorPool()
 
 void App::CreateDescriptorSets()
 {
-	VkDescriptorSetLayout const layouts[]{ m_FrameDescSetLayout, m_FrameDescSetLayout, m_FrameDescSetLayout };
+	std::vector<VkDescriptorSetLayout> const layouts(m_FramesInFlight, *m_FrameDescSetLayout);
 
 	VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{};
 	descriptorSetAllocateInfo.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	descriptorSetAllocateInfo.descriptorPool     = m_DescPool;
 	descriptorSetAllocateInfo.descriptorSetCount = m_FramesInFlight;
-	descriptorSetAllocateInfo.pSetLayouts        = layouts;
+	descriptorSetAllocateInfo.pSetLayouts        = layouts.data();
 
 	m_FrameDescriptorSets.resize(m_FramesInFlight);
 	if (auto const result = m_Context.DispatchTable.allocateDescriptorSets(&descriptorSetAllocateInfo, m_FrameDescriptorSets.data());
@@ -316,7 +316,7 @@ void App::CreateGraphicsPipeline()
 	{
 		PipelineLayoutBuilder builder{ m_Context };
 		PipelineLayout        layout = builder
-								.AddDescriptorSetLayout(m_FrameDescSetLayout)
+								.AddDescriptorSetLayout(*m_FrameDescSetLayout)
 								.Build();
 		m_PipelineLayout = std::make_unique<PipelineLayout>(std::move(layout));
 	}
@@ -364,25 +364,12 @@ void App::CreateCmdPool()
 
 void App::CreateDescriptorSetLayouts()
 {
-	VkDescriptorSetLayoutBinding binding{};
-	binding.binding         = 0;
-	binding.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	binding.stageFlags      = VK_SHADER_STAGE_VERTEX_BIT;
-	binding.descriptorCount = 1;
+	DescriptorSetLayoutBuilder builder{ m_Context };
+	DescriptorSetLayout        layout = builder
+								 .AddBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
+								 .Build();
 
-	VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
-	descriptorSetLayoutCreateInfo.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	descriptorSetLayoutCreateInfo.flags        = 0;
-	descriptorSetLayoutCreateInfo.bindingCount = 1;
-	descriptorSetLayoutCreateInfo.pBindings    = &binding;
-
-	if (m_Context.DispatchTable.createDescriptorSetLayout(&descriptorSetLayoutCreateInfo, nullptr, &m_FrameDescSetLayout) != VK_SUCCESS)
-		throw std::runtime_error("Failed to create frame descriptor set layout");
-
-	m_Context.DeletionQueue.Push([this]
-	{
-		m_Context.DispatchTable.destroyDescriptorSetLayout(m_FrameDescSetLayout, nullptr);
-	});
+	m_FrameDescSetLayout = std::make_unique<DescriptorSetLayout>(std::move(layout));
 }
 
 void App::CreateResources()
