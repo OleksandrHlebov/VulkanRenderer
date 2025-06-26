@@ -1,0 +1,52 @@
+name: CMake Windows Build with Vulkan SDK
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        compiler: [msvc, mingw]
+        build_type: [Release, Debug]
+
+    env:
+      BUILD_TYPE: ${{ matrix.build_type }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    # Setup Vulkan SDK using the install-vulkan-sdk action by humbletim
+    - name: Install Vulkan SDK
+      uses: humbletim/setup-vulkan-sdk@v1.2.1
+      with:
+         vulkan-query-version: 1.3.275.0
+         vulkan-components: Vulkan-Headers, Vulkan-Loader
+         vulkan-use-cache: true
+
+    - name: Setup MSVC environment
+      if: matrix.compiler == 'msvc'
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Add MinGW to PATH
+      if: matrix.compiler == 'mingw'
+      shell: bash
+      run: echo "C:/Program Files/mingw-w64/mingw64/bin" >> $GITHUB_PATH
+
+    - name: Configure CMake
+      shell: cmd
+      run: cmake -B build -G "${{ matrix.compiler == 'msvc' && 'NMake Makefiles' || 'MinGW Makefiles' }}" -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DVulkan_INCLUDE_DIR=%VULKAN_SDK%/Include -DVulkan_LIBRARY=%VULKAN_SDK%/Lib/vulkan-1.lib
+
+    - name: Build
+      shell: cmd
+      run: cmake --build build --config ${{ matrix.build_type }}
+
+    - name: Test
+      shell: cmd
+      working-directory: build
+      run: ctest -C ${{ matrix.build_type }}
