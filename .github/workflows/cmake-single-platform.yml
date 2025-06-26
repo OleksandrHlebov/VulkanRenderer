@@ -21,12 +21,12 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    # Setup Vulkan SDK using the install-vulkan-sdk action by humbletim
+    # Setup Vulkan SDK using the install-vulkan-sdk action by humbletim https://github.com/marketplace/actions/setup-vulkan-sdk
     - name: Install Vulkan SDK
       uses: humbletim/setup-vulkan-sdk@v1.2.1
       with:
          vulkan-query-version: 1.3.275.0
-         vulkan-components: Vulkan-Headers, Vulkan-Loader, Glslang
+         vulkan-components: Vulkan-Headers, Vulkan-Loader, SPIRV-Tools, Glslang
          vulkan-use-cache: true
          
     - name: Verify glslc is available
