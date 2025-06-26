@@ -19,8 +19,8 @@ public:
 		, m_Far{ far }
 	{
 		RecalculateProjection();
-		m_TotalYaw   = glm::degrees(atan2(m_Forward.z, m_Forward.x));
-		m_TotalPitch = glm::degrees(asin(m_Forward.y));
+		m_TotalYaw   = glm::degrees(atan2f(m_Forward.z, m_Forward.x));
+		m_TotalPitch = glm::degrees(asinf(m_Forward.y));
 	}
 
 	~Camera() = default;
@@ -68,9 +68,9 @@ public:
 				m_TotalPitch += delta.y * m_Sensitivity;
 				m_TotalPitch = std::clamp(m_TotalPitch, -89.f, 89.f);
 
-				m_Forward.x = cos(glm::radians(m_TotalYaw)) * cos(glm::radians(m_TotalPitch));
-				m_Forward.y = sin(glm::radians(m_TotalPitch));
-				m_Forward.z = sin(glm::radians(m_TotalYaw)) * cos(glm::radians(m_TotalPitch));
+				m_Forward.x = cosf(glm::radians(m_TotalYaw)) * cosf(glm::radians(m_TotalPitch));
+				m_Forward.y = sinf(glm::radians(m_TotalPitch));
+				m_Forward.z = sinf(glm::radians(m_TotalYaw)) * cosf(glm::radians(m_TotalPitch));
 			}
 		}
 		cache_xPos = xPos;
