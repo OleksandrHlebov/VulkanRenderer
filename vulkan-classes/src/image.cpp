@@ -135,6 +135,12 @@ ImageBuilder& ImageBuilder::SetFlags(VkImageCreateFlags flags)
 	return *this;
 }
 
+ImageBuilder& ImageBuilder::SetSharingMode(VkSharingMode sharingMode)
+{
+	m_SharingMode = sharingMode;
+	return *this;
+}
+
 ImageBuilder& ImageBuilder::SetFileName(std::string const& fileName)
 {
 	m_FileName = fileName;
@@ -156,7 +162,7 @@ Image ImageBuilder::Build(VkImageUsageFlags usage) const
 	createInfo.usage         = usage;
 	createInfo.mipLevels     = 1;
 	createInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	createInfo.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
+	createInfo.sharingMode   = m_SharingMode;
 	createInfo.samples       = VK_SAMPLE_COUNT_1_BIT;
 
 	VmaAllocationCreateInfo vmaAllocationCreateInfo{};

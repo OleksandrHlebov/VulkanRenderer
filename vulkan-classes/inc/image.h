@@ -111,6 +111,7 @@ public:
 	ImageBuilder& SetExtent(VkExtent2D extent);
 	ImageBuilder& SetMemoryUsage(VmaMemoryUsage memoryUsage);
 	ImageBuilder& SetFlags(VkImageCreateFlags flags);
+	ImageBuilder& SetSharingMode(VkSharingMode sharingMode);
 	ImageBuilder& SetFileName(std::string const& fileName);
 
 	[[nodiscard]] Image Build(VkImageUsageFlags usage) const;
@@ -124,6 +125,7 @@ private:
 	VkImageType        m_ImageType{};
 	VkImageCreateFlags m_CreationFlags{};
 	VkImageAspectFlags m_AspectFlags{ VK_IMAGE_ASPECT_COLOR_BIT };
+	VkSharingMode      m_SharingMode{ VK_SHARING_MODE_EXCLUSIVE };
 	VmaMemoryUsage     m_MemoryUsage{ VMA_MEMORY_USAGE_AUTO };
 	uint32_t           m_Layers{ 1 };
 	uint32_t           m_MipLevels{ 1 };

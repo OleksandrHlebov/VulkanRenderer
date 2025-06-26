@@ -220,7 +220,7 @@ void App::CreateSwapchain()
 	Image::ConvertFromSwapchainVkImages(m_Context, m_SwapchainImages);
 	ImageView::ConvertFromSwapchainVkImageViews(m_Context, m_SwapchainImageViews);
 
-	m_FramesInFlight = static_cast<uint32_t>(m_Context.Swapchain.image_count);
+	m_FramesInFlight = m_Context.Swapchain.image_count;
 	m_Context.DeletionQueue.Push([this]
 	{
 		vkb::destroy_swapchain(m_Context.Swapchain);
