@@ -39,15 +39,28 @@ jobs:
         path: ${{ env.VULKAN_SDK_DIR }}
         key: vulkan-sdk-${{ env.VULKAN_VERSION }}
 
-    - name: Download and Extract Vulkan SDK
+    - name: Install Vulkan SDK
       if: steps.cache-vulkan.outputs.cache-hit != 'true'
       shell: powershell
       run: |
+        $ErrorActionPreference = "Stop"
         $version = "${{ env.VULKAN_VERSION }}"
-        $zipUrl = "https://sdk.lunarg.com/sdk/download/$version/windows/VulkanSDK-$version-windows.zip"
-        Invoke-WebRequest $zipUrl -OutFile vulkan-sdk.zip
-        Expand-Archive vulkan-sdk.zip -DestinationPath "C:\VulkanSDK"
+        $url = "https://sdk.lunarg.com/sdk/download/$version/windows/VulkanSDK-$version-Installer.exe?Human=true"
+        Invoke-WebRequest -Uri $url -OutFile VulkanSDKInstaller.exe
 
+        $process = Start-Process -FilePath .\VulkanSDKInstaller.exe -ArgumentList "/S" -PassThru
+        $maxWait = 120  # seconds
+        $waited = 0
+        while (-not $process.HasExited -and $waited -lt $maxWait) {
+          Start-Sleep -Seconds 5
+          $waited += 5
+        }
+        if (-not $process.HasExited) {
+          Write-Error "Vulkan SDK installer timed out after $maxWait seconds. Killing process."
+          Stop-Process -Id $process.Id -Force
+          exit 1
+        }
+        
     - name: Set Vulkan Env Vars
       shell: powershell
       run: |
