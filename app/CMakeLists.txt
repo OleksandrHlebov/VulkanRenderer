@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.31)
 project(App)
 
-find_program(GLSLC glslc)
+find_program(GLSLANG glslang)
 
-if (!GLSLC)
+if (!GLSLANG)
 	message(FATAL_ERROR "Shader compiler not found")
 endif ()
 
@@ -17,7 +17,7 @@ macro(Shader_Compile name)
 	set(SHADER_SPIRV_PATH ${CMAKE_BINARY_DIR}/shaders/${SHADER_FILENAME_WE}.spv)
 
 	add_custom_command(OUTPUT ${SHADER_SPIRV_PATH}
-	                   COMMAND glslc -V --target-env vulkan1.3 ${SHADER_SOURCE} -o ${SHADER_SPIRV_PATH}
+	                   COMMAND glslang -V --target-env vulkan1.3 ${SHADER_SOURCE} -o ${SHADER_SPIRV_PATH}
 	                   DEPENDS ${SHADER_SOURCE}
 	                   COMMENT "Compiled ${SHADER_SPIRV_PATH}")
 	list(APPEND COMPILED_SHADERS ${SHADER_SPIRV_PATH})
