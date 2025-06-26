@@ -7,6 +7,7 @@
 #include "camera.h"
 #include "VkBootstrap.h"
 
+class DescriptorPool;
 class DescriptorSetLayout;
 class ImageView;
 class Image;
@@ -55,7 +56,7 @@ private:
 	Context      m_Context{};
 
 	uptr<DescriptorSetLayout> m_FrameDescSetLayout{};
-	VkDescriptorPool          m_DescPool{};
+	uptr<DescriptorPool>      m_DescPool{};
 
 	uptr<PipelineLayout> m_PipelineLayout;
 	uptr<Pipeline>       m_Pipeline{};

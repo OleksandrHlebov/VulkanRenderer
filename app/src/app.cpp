@@ -1,6 +1,7 @@
 #include "app.h"
 
 #include "datatypes.h"
+#include "descriptor_pool.h"
 #include "descriptor_set_layout.h"
 #include "helper.h"
 #include "image.h"
@@ -257,23 +258,12 @@ void App::CreateSyncObjects()
 
 void App::CreateDescriptorPool()
 {
-	VkDescriptorPoolSize descriptorPoolSize{};
-	descriptorPoolSize.type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	descriptorPoolSize.descriptorCount = m_FramesInFlight;
+	DescriptorPoolBuilder builder{ m_Context };
+	DescriptorPool        pool = builder
+						  .AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, m_FramesInFlight)
+						  .Build(m_FramesInFlight);
 
-	VkDescriptorPoolCreateInfo poolCreateInfo{};
-	poolCreateInfo.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	poolCreateInfo.poolSizeCount = 1;
-	poolCreateInfo.pPoolSizes    = &descriptorPoolSize;
-	poolCreateInfo.maxSets       = m_FramesInFlight;
-
-	if (auto const result = m_Context.DispatchTable.createDescriptorPool(&poolCreateInfo, nullptr, &m_DescPool);
-		result != VK_SUCCESS)
-		throw std::runtime_error("Failed to create descriptor pool " + result);
-	m_Context.DeletionQueue.Push([this]
-	{
-		m_Context.DispatchTable.destroyDescriptorPool(m_DescPool, nullptr);
-	});
+	m_DescPool = std::make_unique<DescriptorPool>(std::move(pool));
 }
 
 void App::CreateDescriptorSets()
@@ -282,7 +272,7 @@ void App::CreateDescriptorSets()
 
 	VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{};
 	descriptorSetAllocateInfo.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	descriptorSetAllocateInfo.descriptorPool     = m_DescPool;
+	descriptorSetAllocateInfo.descriptorPool     = *m_DescPool;
 	descriptorSetAllocateInfo.descriptorSetCount = m_FramesInFlight;
 	descriptorSetAllocateInfo.pSetLayouts        = layouts.data();
 

@@ -6,23 +6,25 @@ set(CMAKE_CXX_STANDARD 20)
 set(INCLUDE
     inc/vma_usage.h
     inc/deletion_queue.h
-    inc/image.h
     inc/datatypes.h
     inc/Buffer.h
+    inc/image.h
     inc/image_view.h
     inc/pipeline_layout.h
     inc/pipeline.h
-    inc/descriptor_set_layout.h)
+    inc/descriptor_set_layout.h
+    inc/descriptor_pool.h)
 
 set(SOURCE
     src/main.cpp
     src/vma_usage.cpp
-    src/image.cpp
     src/buffer.cpp
+    src/image.cpp
     src/image_view.cpp
     src/pipeline_layout.cpp
     src/pipeline.cpp
-    src/descriptor_set_layout.cpp)
+    src/descriptor_set_layout.cpp
+    src/descriptor_pool.cpp)
 
 add_library(VulkanClasses STATIC
             ${SOURCE}

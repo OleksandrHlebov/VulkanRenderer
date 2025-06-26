@@ -81,12 +81,12 @@ PipelineBuilder& PipelineBuilder::AddViewport(VkExtent2D const& extent)
 	viewport.height   = static_cast<float>(extent.height);
 	viewport.minDepth = 0.0f;
 	viewport.maxDepth = 1.0f;
-	m_Viewports.emplace_back(std::move(viewport));
+	m_Viewports.emplace_back(viewport);
 
 	VkRect2D scissor{};
 	scissor.extent = extent;
 	scissor.offset = { 0, 0 };
-	m_Scissors.emplace_back(std::move(scissor));
+	m_Scissors.emplace_back(scissor);
 	return *this;
 }
 
