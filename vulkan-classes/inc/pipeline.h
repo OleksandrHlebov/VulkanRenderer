@@ -71,7 +71,7 @@ public:
 
 	PipelineBuilder& EnableDepthWrite(VkBool32 enable = VK_TRUE);
 
-	[[nodiscard]] Pipeline Build(PipelineLayout const& layout);
+	[[nodiscard]] Pipeline Build(PipelineLayout const& layout, bool addToQueue = true);
 
 private:
 	Context& m_Context;

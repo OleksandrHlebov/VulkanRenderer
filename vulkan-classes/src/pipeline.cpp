@@ -136,7 +136,7 @@ PipelineBuilder& PipelineBuilder::EnableDepthWrite(VkBool32 enable)
 	return *this;
 }
 
-Pipeline PipelineBuilder::Build(PipelineLayout const& layout)
+Pipeline PipelineBuilder::Build(PipelineLayout const& layout, bool addToQueue)
 {
 	Pipeline pipeline{};
 
@@ -173,11 +173,12 @@ Pipeline PipelineBuilder::Build(PipelineLayout const& layout)
 														, pipeline) != VK_SUCCESS)
 		throw std::runtime_error("failed to create graphics pipeline");
 
-	m_Context.DeletionQueue.
-			  Push([context = &m_Context, pipeline = pipeline.m_Pipeline]
-			  {
-				  context->DispatchTable.destroyPipeline(pipeline, nullptr);
-			  });
+	if (addToQueue)
+		m_Context.DeletionQueue.
+				  Push([context = &m_Context, pipeline = pipeline.m_Pipeline]
+				  {
+					  context->DispatchTable.destroyPipeline(pipeline, nullptr);
+				  });
 
 	return pipeline;
 }

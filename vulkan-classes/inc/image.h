@@ -21,7 +21,7 @@ public:
 		, uint32_t        baseLayer    = 0
 		, uint32_t        layerCount   = 1
 		, uint32_t        baseMipLevel = 0
-		, uint32_t        levelCount   = 1
+		, uint32_t        levelCount   = 1, bool addToQueue = true
 	) const;
 
 	struct Transition
@@ -42,6 +42,8 @@ public:
 		uint32_t SrcQueue{ VK_QUEUE_FAMILY_IGNORED };
 		uint32_t DstQueue{ VK_QUEUE_FAMILY_IGNORED };
 	};
+
+	void Destroy(Context const& context) const;
 
 	void MakeTransition(Context const& context, VkCommandBuffer commandBuffer, Transition const& transition);
 
@@ -114,7 +116,7 @@ public:
 	ImageBuilder& SetSharingMode(VkSharingMode sharingMode);
 	ImageBuilder& SetFileName(std::string const& fileName);
 
-	[[nodiscard]] Image Build(VkImageUsageFlags usage) const;
+	[[nodiscard]] Image Build(VkImageUsageFlags usage, bool addToQueue = true) const;
 
 private:
 	Context&           m_Context;

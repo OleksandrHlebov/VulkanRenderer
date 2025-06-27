@@ -46,7 +46,7 @@ public:
 
 	DescriptorPoolBuilder& AddPoolSize(VkDescriptorType type, uint32_t count);
 
-	[[nodiscard]] DescriptorPool Build(uint32_t maxSets);
+	[[nodiscard]] DescriptorPool Build(uint32_t maxSets, bool addToQueue = true);
 
 private:
 	Context& m_Context;

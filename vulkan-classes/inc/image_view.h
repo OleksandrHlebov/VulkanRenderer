@@ -14,6 +14,8 @@ public:
 
 	static void ConvertFromSwapchainVkImageViews(Context& context, std::vector<ImageView>& convertedViews);
 
+	void Destroy(Context const& context) const;
+
 	operator VkImageView() const
 	{
 		return m_ImageView;

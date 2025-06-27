@@ -1,7 +1,10 @@
 #include "image.h"
 
 ImageView Image::CreateView
-(Context& context, VkImageViewType type, uint32_t baseLayer, uint32_t layerCount, uint32_t baseMipLevel, uint32_t levelCount) const
+(
+	Context& context, VkImageViewType type, uint32_t baseLayer, uint32_t layerCount, uint32_t baseMipLevel, uint32_t levelCount, bool
+	addToQueue
+) const
 {
 	ImageView imageView{};
 
@@ -20,12 +23,19 @@ ImageView Image::CreateView
 	if (auto const result = context.DispatchTable.createImageView(&imageViewCreateInfo, nullptr, imageView);
 		result != VK_SUCCESS)
 		throw std::runtime_error("Failed to create image view");
-	context.DeletionQueue.Push([context = &context, imageView = imageView.m_ImageView]
-	{
-		context->DispatchTable.destroyImageView(imageView, nullptr);
-	});
+
+	if (addToQueue)
+		context.DeletionQueue.Push([context = &context, imageView = imageView.m_ImageView]
+		{
+			context->DispatchTable.destroyImageView(imageView, nullptr);
+		});
 
 	return imageView;
+}
+
+void Image::Destroy(Context const& context) const
+{
+	vmaDestroyImage(context.Allocator, *this, m_Allocation);
 }
 
 void Image::MakeTransition(Context const& context, VkCommandBuffer commandBuffer, Transition const& transition)
@@ -148,7 +158,7 @@ ImageBuilder& ImageBuilder::SetFileName(std::string const& fileName)
 	return *this;
 }
 
-Image ImageBuilder::Build(VkImageUsageFlags usage) const
+Image ImageBuilder::Build(VkImageUsageFlags usage, bool addToQueue) const
 {
 	VkImageCreateInfo createInfo{};
 	createInfo.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -182,10 +192,11 @@ Image ImageBuilder::Build(VkImageUsageFlags usage) const
 
 	vmaCreateImage(m_Context.Allocator, &createInfo, &vmaAllocationCreateInfo, image, &image.m_Allocation, nullptr);
 
-	m_Context.DeletionQueue.Push([context = &m_Context, image = image.m_Image, allocation = image.m_Allocation]
-	{
-		vmaDestroyImage(context->Allocator, image, allocation);
-	});
+	if (addToQueue)
+		m_Context.DeletionQueue.Push([context = &m_Context, image = image.m_Image, allocation = image.m_Allocation]
+		{
+			vmaDestroyImage(context->Allocator, image, allocation);
+		});
 
 	return image;
 }

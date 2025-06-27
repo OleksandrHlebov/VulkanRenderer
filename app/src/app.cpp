@@ -21,6 +21,9 @@ App::App(int width, int height)
 	CreateSwapchain();
 	m_Context.DeletionQueue.Push([this]
 	{
+		m_DepthImage->Destroy(m_Context);
+		m_DepthImageView->Destroy(m_Context);
+
 		std::vector<VkImageView> views;
 		views.reserve(m_SwapchainImageViews.size());
 		for (uint32_t index{}; index < m_SwapchainImageViews.size(); ++index)
@@ -329,7 +332,7 @@ void App::CreateGraphicsPipeline()
 						.EnableDepthWrite()
 						.AddShaderStage(vert, VK_SHADER_STAGE_VERTEX_BIT)
 						.AddShaderStage(frag, VK_SHADER_STAGE_FRAGMENT_BIT)
-						.Build(*m_PipelineLayout);
+						.Build(*m_PipelineLayout, true);
 	m_Pipeline = std::make_unique<Pipeline>(std::move(pipeline));
 
 	m_Context.DispatchTable.destroyShaderModule(vert, nullptr);
@@ -383,10 +386,10 @@ void App::CreateDepth()
 				  .SetType(VK_IMAGE_TYPE_2D)
 				  .SetAspectFlags(VK_IMAGE_ASPECT_DEPTH_BIT | help::HasStencilComponent(m_DepthFormat) *
 								  VK_IMAGE_ASPECT_STENCIL_BIT)
-				  .Build(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+				  .Build(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, false);
 	m_DepthImage = std::make_unique<Image>(std::move(image));
 
-	ImageView imageView = m_DepthImage->CreateView(m_Context, VK_IMAGE_VIEW_TYPE_2D);
+	ImageView imageView = m_DepthImage->CreateView(m_Context, VK_IMAGE_VIEW_TYPE_2D, 0, 1, 0, 1, false);
 	m_DepthImageView    = std::make_unique<ImageView>(std::move(imageView));
 }
 
@@ -412,16 +415,23 @@ void App::CreateCommandBuffers()
 
 void App::RecreateSwapchain()
 {
+	if (auto const result = m_Context.DispatchTable.deviceWaitIdle();
+		result != VK_SUCCESS)
+		throw std::runtime_error("Failed to wait for device to be idle");
+
 	std::vector<VkImageView> views;
 	views.reserve(m_SwapchainImageViews.size());
 	for (uint32_t index{}; index < m_SwapchainImageViews.size(); ++index)
 		views.emplace_back(m_SwapchainImageViews[index]);
 	m_Context.Swapchain.destroy_image_views(views);
 
+	m_DepthImage->Destroy(m_Context);
+	m_DepthImageView->Destroy(m_Context);
+
 	CreateSwapchain();
 	CreateDepth();
 	m_Camera->SetNewAspectRatio(static_cast<float>(m_Context.Swapchain.extent.width)
-								/ m_Context.Swapchain.extent.height);
+								/ m_Context.Swapchain.extent.height); // NOLINT(*-narrowing-conversions)
 }
 
 void App::RecordCommandBuffer(VkCommandBuffer commandBuffer, size_t imageIndex)

@@ -69,7 +69,7 @@ public:
 
 	BufferBuilder& SetRequiredMemoryFlags(VkMemoryPropertyFlags flags);
 
-	Buffer Build(VkBufferUsageFlags usage, VkDeviceSize size, bool mapMemory = false);
+	[[nodiscard]] Buffer Build(VkBufferUsageFlags usage, VkDeviceSize size, bool mapMemory = false, bool addToQueue = true);
 
 private:
 	Context&                m_Context;

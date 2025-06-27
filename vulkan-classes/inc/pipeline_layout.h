@@ -50,7 +50,7 @@ public:
 
 	PipelineLayoutBuilder& AddPushConstant(VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size);
 
-	[[nodiscard]] PipelineLayout Build() const;
+	[[nodiscard]] PipelineLayout Build(bool addToQueue = true) const;
 
 private:
 	Context& m_Context;

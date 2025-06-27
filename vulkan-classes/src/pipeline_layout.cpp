@@ -12,7 +12,7 @@ PipelineLayoutBuilder& PipelineLayoutBuilder::AddPushConstant(VkShaderStageFlags
 	return *this;
 }
 
-PipelineLayout PipelineLayoutBuilder::Build() const
+PipelineLayout PipelineLayoutBuilder::Build(bool addToQueue) const
 {
 	PipelineLayout layout{};
 
@@ -24,10 +24,11 @@ PipelineLayout PipelineLayoutBuilder::Build() const
 	pipelineLayoutInfo.pPushConstantRanges    = m_PushConstantRanges.data();
 
 	m_Context.DispatchTable.createPipelineLayout(&pipelineLayoutInfo, nullptr, layout);
-	m_Context.DeletionQueue.Push([context = &m_Context, layout = layout.m_Layout]
-	{
-		context->DispatchTable.destroyPipelineLayout(layout, nullptr);
-	});
+	if (addToQueue)
+		m_Context.DeletionQueue.Push([context = &m_Context, layout = layout.m_Layout]
+		{
+			context->DispatchTable.destroyPipelineLayout(layout, nullptr);
+		});
 
 	return layout;
 }

@@ -15,7 +15,7 @@ DescriptorSetLayoutBuilder& DescriptorSetLayoutBuilder::AddBinding
 	return *this;
 }
 
-DescriptorSetLayout DescriptorSetLayoutBuilder::Build()
+DescriptorSetLayout DescriptorSetLayoutBuilder::Build(bool addToQueue)
 {
 	DescriptorSetLayout             layout{};
 	VkDescriptorSetLayoutCreateInfo layoutInfo{};
@@ -25,10 +25,11 @@ DescriptorSetLayout DescriptorSetLayoutBuilder::Build()
 	if (m_Context.DispatchTable.createDescriptorSetLayout(&layoutInfo, nullptr, layout) != VK_SUCCESS)
 		throw std::runtime_error("Failed to create frame descriptor set layout");
 
-	m_Context.DeletionQueue.Push([context = &m_Context, layout = layout.m_Layout]
-	{
-		context->DispatchTable.destroyDescriptorSetLayout(layout, nullptr);
-	});
+	if (addToQueue)
+		m_Context.DeletionQueue.Push([context = &m_Context, layout = layout.m_Layout]
+		{
+			context->DispatchTable.destroyDescriptorSetLayout(layout, nullptr);
+		});
 	m_Bindings.clear();
 	return layout;
 }

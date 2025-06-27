@@ -25,7 +25,7 @@ BufferBuilder& BufferBuilder::SetRequiredMemoryFlags(VkMemoryPropertyFlags flags
 	return *this;
 }
 
-Buffer BufferBuilder::Build(VkBufferUsageFlags usage, VkDeviceSize size, bool mapMemory)
+Buffer BufferBuilder::Build(VkBufferUsageFlags usage, VkDeviceSize size, bool mapMemory, bool addToQueue)
 {
 	Buffer buffer{};
 
@@ -38,13 +38,14 @@ Buffer BufferBuilder::Build(VkBufferUsageFlags usage, VkDeviceSize size, bool ma
 
 	vmaGetAllocationInfo(m_Context.Allocator, buffer.m_Allocation, &buffer.m_AllocationInfo);
 
-	m_Context.DeletionQueue.Push([context = &m_Context
-									 , buffer = buffer.m_Buffer
-									 , allocation = buffer.m_Allocation]
-								 {
-									 vmaUnmapMemory(context->Allocator, allocation);
-									 vmaDestroyBuffer(context->Allocator, buffer, allocation);
-								 });
+	if (addToQueue)
+		m_Context.DeletionQueue.Push([context = &m_Context
+										 , buffer = buffer.m_Buffer
+										 , allocation = buffer.m_Allocation]
+									 {
+										 vmaUnmapMemory(context->Allocator, allocation);
+										 vmaDestroyBuffer(context->Allocator, buffer, allocation);
+									 });
 
 	return buffer;
 }

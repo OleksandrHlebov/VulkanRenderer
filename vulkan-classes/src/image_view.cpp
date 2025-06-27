@@ -14,3 +14,8 @@ void ImageView::ConvertFromSwapchainVkImageViews(Context& context, std::vector<I
 		convertedViews.emplace_back(std::move(convertedView));
 	}
 }
+
+void ImageView::Destroy(Context const& context) const
+{
+	context.DispatchTable.destroyImageView(*this, nullptr);
+}

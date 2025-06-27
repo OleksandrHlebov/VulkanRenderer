@@ -46,7 +46,8 @@ void DescriptorSet::Update(Context const& context)
 DescriptorSetBuilder::DescriptorSetBuilder(Context& context)
 	: m_Context{ context } {}
 
-std::vector<DescriptorSet> DescriptorSetBuilder::Build(VkDescriptorPool pool, std::span<VkDescriptorSetLayout> layouts) const
+std::vector<DescriptorSet> DescriptorSetBuilder::Build
+(VkDescriptorPool pool, std::span<VkDescriptorSetLayout> layouts) const
 {
 	std::vector<VkDescriptorSet> sets(layouts.size());
 

@@ -47,7 +47,7 @@ public:
 	DescriptorSetLayoutBuilder& AddBinding
 	(uint32_t binding, VkDescriptorType descriptorType, VkShaderStageFlags stageFlags, uint32_t count = 1);
 
-	[[nodiscard]] DescriptorSetLayout Build();
+	[[nodiscard]] DescriptorSetLayout Build(bool addToQueue = true);
 
 private:
 	Context& m_Context;
