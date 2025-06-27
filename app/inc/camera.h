@@ -77,6 +77,12 @@ public:
 		cache_yPos = yPos;
 	}
 
+	void SetNewAspectRatio(float aspectRatio)
+	{
+		m_AspectRatio = aspectRatio;
+		RecalculateProjection();
+	}
+
 	[[nodiscard]] glm::mat4 CalculateViewMatrix() const
 	{
 		return glm::lookAt(m_Position, m_Position + m_Forward, WORLD_UP);

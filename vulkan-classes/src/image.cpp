@@ -62,6 +62,7 @@ void Image::MakeTransition(Context const& context, VkCommandBuffer commandBuffer
 
 void Image::ConvertFromSwapchainVkImages(Context& context, std::vector<Image>& convertedImages)
 {
+	convertedImages.clear();
 	convertedImages.reserve(context.Swapchain.image_count);
 	auto const resultImages = context.Swapchain.get_images();
 	if (!resultImages)

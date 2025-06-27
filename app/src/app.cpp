@@ -19,6 +19,15 @@ App::App(int width, int height)
 	CreateSurface();
 	CreateDevice();
 	CreateSwapchain();
+	m_Context.DeletionQueue.Push([this]
+	{
+		std::vector<VkImageView> views;
+		views.reserve(m_SwapchainImageViews.size());
+		for (uint32_t index{}; index < m_SwapchainImageViews.size(); ++index)
+			views.emplace_back(m_SwapchainImageViews[index]);
+		m_Context.Swapchain.destroy_image_views(views);
+		vkb::destroy_swapchain(m_Context.Swapchain);
+	});
 	CreateCmdPool();
 	// TODO: Load scene
 	CreateDescriptorSetLayouts();
@@ -48,11 +57,16 @@ void App::Run()
 
 		m_MVPUBOs[m_CurrentFrame].UpdateData(mvp);
 		uint32_t imageIndex{};
-		m_Context.DispatchTable.acquireNextImageKHR(m_Context.Swapchain
-													, UINT64_MAX
-													, m_ImageAvailableSemaphores[m_CurrentFrame]
-													, VK_NULL_HANDLE
-													, &imageIndex);
+		if (auto const result = m_Context.DispatchTable.acquireNextImageKHR(m_Context.Swapchain
+																			, UINT64_MAX
+																			, m_ImageAvailableSemaphores[m_CurrentFrame]
+																			, VK_NULL_HANDLE
+																			, &imageIndex);
+			result == VK_ERROR_OUT_OF_DATE_KHR)
+		{
+			RecreateSwapchain();
+			return;
+		}
 
 		m_Context.DispatchTable.resetFences(1, &m_InFlightFences[m_CurrentFrame]);
 
@@ -91,7 +105,7 @@ void App::CreateWindow(int width, int height)
 {
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+	glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 	m_Context.Window = glfwCreateWindow(width, height, "Base window", nullptr, nullptr);
 	m_Context.DeletionQueue.Push([this]
 	{
@@ -214,6 +228,7 @@ void App::CreateSwapchain()
 	if (!swapchainResult)
 		throw std::runtime_error("Failed to create swapchain" + swapchainResult.error().message() +
 								 " " + std::to_string(swapchainResult.vk_result()));
+
 	vkb::destroy_swapchain(m_Context.Swapchain);
 	m_Context.Swapchain = swapchainResult.value();
 
@@ -221,10 +236,6 @@ void App::CreateSwapchain()
 	ImageView::ConvertFromSwapchainVkImageViews(m_Context, m_SwapchainImageViews);
 
 	m_FramesInFlight = m_Context.Swapchain.image_count;
-	m_Context.DeletionQueue.Push([this]
-	{
-		vkb::destroy_swapchain(m_Context.Swapchain);
-	});
 }
 
 void App::CreateSyncObjects()
@@ -360,21 +371,23 @@ void App::CreateResources()
 		for (uint32_t index{}; index < m_FramesInFlight; ++index)
 			m_MVPUBOs.emplace_back(builder.Build(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, sizeof(ModelViewProj), true));
 	}
-	// depth image
-	{
-		ImageBuilder builder{ m_Context };
-		Image        image = builder
-					  .SetExtent(m_Context.Swapchain.extent)
-					  .SetFormat(m_DepthFormat)
-					  .SetType(VK_IMAGE_TYPE_2D)
-					  .SetAspectFlags(VK_IMAGE_ASPECT_DEPTH_BIT | help::HasStencilComponent(m_DepthFormat) *
-									  VK_IMAGE_ASPECT_STENCIL_BIT)
-					  .Build(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
-		m_DepthImage = std::make_unique<Image>(std::move(image));
+	CreateDepth();
+}
 
-		ImageView imageView = m_DepthImage->CreateView(m_Context, VK_IMAGE_VIEW_TYPE_2D);
-		m_DepthImageView    = std::make_unique<ImageView>(std::move(imageView));
-	}
+void App::CreateDepth()
+{
+	ImageBuilder builder{ m_Context };
+	Image        image = builder
+				  .SetExtent(m_Context.Swapchain.extent)
+				  .SetFormat(m_DepthFormat)
+				  .SetType(VK_IMAGE_TYPE_2D)
+				  .SetAspectFlags(VK_IMAGE_ASPECT_DEPTH_BIT | help::HasStencilComponent(m_DepthFormat) *
+								  VK_IMAGE_ASPECT_STENCIL_BIT)
+				  .Build(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+	m_DepthImage = std::make_unique<Image>(std::move(image));
+
+	ImageView imageView = m_DepthImage->CreateView(m_Context, VK_IMAGE_VIEW_TYPE_2D);
+	m_DepthImageView    = std::make_unique<ImageView>(std::move(imageView));
 }
 
 void App::CreateCommandBuffers()
@@ -395,6 +408,20 @@ void App::CreateCommandBuffers()
 												   , static_cast<uint32_t>(m_CommandBuffers.size())
 												   , m_CommandBuffers.data());
 	});
+}
+
+void App::RecreateSwapchain()
+{
+	std::vector<VkImageView> views;
+	views.reserve(m_SwapchainImageViews.size());
+	for (uint32_t index{}; index < m_SwapchainImageViews.size(); ++index)
+		views.emplace_back(m_SwapchainImageViews[index]);
+	m_Context.Swapchain.destroy_image_views(views);
+
+	CreateSwapchain();
+	CreateDepth();
+	m_Camera->SetNewAspectRatio(static_cast<float>(m_Context.Swapchain.extent.width)
+								/ m_Context.Swapchain.extent.height);
 }
 
 void App::RecordCommandBuffer(VkCommandBuffer commandBuffer, size_t imageIndex)
@@ -536,7 +563,7 @@ void App::Submit() const
 		throw std::runtime_error("Failed to submit command buffer");
 }
 
-void App::Present(uint32_t imageIndex) const
+void App::Present(uint32_t imageIndex)
 {
 	VkSwapchainKHR const swapchains[]{ m_Context.Swapchain };
 
@@ -548,7 +575,9 @@ void App::Present(uint32_t imageIndex) const
 	presentInfo.pSwapchains        = swapchains;
 	presentInfo.pImageIndices      = &imageIndex;
 
-	m_Context.DispatchTable.queuePresentKHR(m_Context.PresentQueue, &presentInfo);
+	if (auto const result = m_Context.DispatchTable.queuePresentKHR(m_Context.PresentQueue, &presentInfo);
+		result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
+		RecreateSwapchain();
 }
 
 void App::End()

@@ -47,10 +47,12 @@ private:
 	void CreateCmdPool();
 	void CreateDescriptorSetLayouts();
 	void CreateResources();
+	void CreateDepth();
 	void CreateCommandBuffers();
+	void RecreateSwapchain();
 	void RecordCommandBuffer(VkCommandBuffer commandBuffer, size_t imageIndex);
 	void Submit() const;
-	void Present(uint32_t imageIndex) const;
+	void Present(uint32_t imageIndex);
 	void End();
 
 	uptr<Camera> m_Camera;
