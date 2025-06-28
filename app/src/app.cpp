@@ -1,5 +1,6 @@
 #include "app.h"
 
+#include "command_pool.h"
 #include "datatypes.h"
 #include "descriptor_pool.h"
 #include "descriptor_set_layout.h"
@@ -41,7 +42,6 @@ App::App(int width, int height)
 	CreateSyncObjects();
 	CreateDescriptorPool();
 	CreateDescriptorSets();
-	CreateCommandBuffers();
 }
 
 App::~App() = default;
@@ -72,11 +72,11 @@ void App::Run()
 			return;
 		}
 
+		CommandBuffer& commandBuffer = m_CommandPool->AllocateCommandBuffer(m_Context);
 		m_Context.DispatchTable.resetFences(1, &m_InFlightFences[m_CurrentFrame]);
 
-		RecordCommandBuffer(m_CommandBuffers[m_CurrentFrame], imageIndex);
-
-		Submit();
+		RecordCommandBuffer(commandBuffer, imageIndex);
+		Submit(commandBuffer);
 
 		Present(imageIndex);
 
@@ -88,21 +88,6 @@ void App::Run()
 		throw std::runtime_error("Failed to wait for the device");
 
 	End();
-}
-
-VkShaderModule App::CreateShaderModule(std::vector<char> code) const
-{
-	VkShaderModule module{};
-
-	VkShaderModuleCreateInfo createInfo{};
-	createInfo.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	createInfo.pNext    = nullptr;
-	createInfo.flags    = 0;
-	createInfo.codeSize = code.size() * sizeof(code[0]);
-	createInfo.pCode    = reinterpret_cast<uint32_t*>(code.data());
-	vkCreateShaderModule(m_Context.Device, &createInfo, nullptr, &module);
-
-	return module;
 }
 
 void App::CreateWindow(int width, int height)
@@ -314,9 +299,6 @@ void App::CreateGraphicsPipeline()
 		m_PipelineLayout = std::make_unique<PipelineLayout>(std::move(layout));
 	}
 
-	// VkShaderModule const vert = CreateShaderModule(help::ReadFile("shaders/basic_transform.spv"));
-	// VkShaderModule const frag = CreateShaderModule(help::ReadFile("shaders/basic_color.spv"));
-
 	ShaderStage const vert{ m_Context, help::ReadFile("shaders/basic_transform.spv"), VK_SHADER_STAGE_VERTEX_BIT };
 	ShaderStage const frag{ m_Context, help::ReadFile("shaders/basic_color.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
 
@@ -342,17 +324,10 @@ void App::CreateGraphicsPipeline()
 
 void App::CreateCmdPool()
 {
-	VkCommandPoolCreateInfo cmdPoolInfo{};
-	cmdPoolInfo.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-	cmdPoolInfo.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-	cmdPoolInfo.queueFamilyIndex = m_Context.Device.get_queue_index(vkb::QueueType::graphics).value();
-	if (m_Context.DispatchTable.createCommandPool(&cmdPoolInfo, nullptr, &m_Context.CommandPool) != VK_SUCCESS)
-		throw std::runtime_error("Failed to create a command pool");
-
-	m_Context.DeletionQueue.Push([this]
-	{
-		m_Context.DispatchTable.destroyCommandPool(m_Context.CommandPool, nullptr);
-	});
+	m_CommandPool = std::make_unique<CommandPool>(m_Context
+												  , m_Context.Device.get_queue_index(vkb::QueueType::graphics).value()
+												  , m_FramesInFlight
+												  , VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 }
 
 void App::CreateDescriptorSetLayouts()
@@ -394,26 +369,6 @@ void App::CreateDepth()
 	m_DepthImageView    = std::make_unique<ImageView>(std::move(imageView));
 }
 
-void App::CreateCommandBuffers()
-{
-	m_CommandBuffers.resize(m_FramesInFlight);
-
-	VkCommandBufferAllocateInfo cmdBufferAllocateInfo{};
-	cmdBufferAllocateInfo.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	cmdBufferAllocateInfo.commandPool        = m_Context.CommandPool;
-	cmdBufferAllocateInfo.commandBufferCount = m_FramesInFlight;
-	cmdBufferAllocateInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-
-	if (m_Context.DispatchTable.allocateCommandBuffers(&cmdBufferAllocateInfo, m_CommandBuffers.data()) != VK_SUCCESS)
-		throw std::runtime_error("Failed to allocate command buffers");
-	m_Context.DeletionQueue.Push([this]
-	{
-		m_Context.DispatchTable.freeCommandBuffers(m_Context.CommandPool
-												   , static_cast<uint32_t>(m_CommandBuffers.size())
-												   , m_CommandBuffers.data());
-	});
-}
-
 void App::RecreateSwapchain()
 {
 	if (auto const result = m_Context.DispatchTable.deviceWaitIdle();
@@ -435,11 +390,9 @@ void App::RecreateSwapchain()
 								/ m_Context.Swapchain.extent.height); // NOLINT(*-narrowing-conversions)
 }
 
-void App::RecordCommandBuffer(VkCommandBuffer commandBuffer, size_t imageIndex)
+void App::RecordCommandBuffer(CommandBuffer& commandBuffer, size_t imageIndex)
 {
-	VkCommandBufferBeginInfo beginInfo{};
-	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	m_Context.DispatchTable.beginCommandBuffer(commandBuffer, &beginInfo);
+	commandBuffer.Begin(m_Context);
 	Image& swapchainImage = m_SwapchainImages[imageIndex];
 	// swapchain image to attachment optimal
 	{
@@ -536,42 +489,24 @@ void App::RecordCommandBuffer(VkCommandBuffer commandBuffer, size_t imageIndex)
 		}
 		swapchainImage.MakeTransition(m_Context, commandBuffer, transition);
 	}
-	m_Context.DispatchTable.endCommandBuffer(commandBuffer);
+	commandBuffer.End(m_Context);
 }
 
-void App::Submit() const
+void App::Submit(CommandBuffer& commandBuffer) const
 {
-	VkSubmitInfo2 submitInfo{};
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-
-	VkCommandBufferSubmitInfo cmdBufferSubmitInfo{};
-	cmdBufferSubmitInfo.sType         = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
-	cmdBufferSubmitInfo.commandBuffer = m_CommandBuffers[m_CurrentFrame];
-
-	submitInfo.commandBufferInfoCount = 1;
-	submitInfo.pCommandBufferInfos    = &cmdBufferSubmitInfo;
-
 	VkSemaphoreSubmitInfo waitSemaphoreSubmitInfo{};
 	waitSemaphoreSubmitInfo.sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
 	waitSemaphoreSubmitInfo.semaphore = m_ImageAvailableSemaphores[m_CurrentFrame];
 	waitSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
 
-	submitInfo.waitSemaphoreInfoCount = 1;
-	submitInfo.pWaitSemaphoreInfos    = &waitSemaphoreSubmitInfo;
-
 	VkSemaphoreSubmitInfo signalSemaphoreSubmitInfo{};
 	signalSemaphoreSubmitInfo.sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
 	signalSemaphoreSubmitInfo.semaphore = m_RenderFinishedSemaphores[m_CurrentFrame];
 
-	submitInfo.signalSemaphoreInfoCount = 1;
-	submitInfo.pSignalSemaphoreInfos    = &signalSemaphoreSubmitInfo;
+	VkSemaphoreSubmitInfo waitSemaphoreInfos[]{ waitSemaphoreSubmitInfo };
+	VkSemaphoreSubmitInfo signalSemaphoreInfos[]{ signalSemaphoreSubmitInfo };
 
-	if (VkResult const result = m_Context.DispatchTable.queueSubmit2(m_Context.GraphicsQueue
-																	 , 1
-																	 , &submitInfo
-																	 , m_InFlightFences[m_CurrentFrame]);
-		result != VK_SUCCESS)
-		throw std::runtime_error("Failed to submit command buffer");
+	commandBuffer.Submit(m_Context, m_Context.GraphicsQueue, waitSemaphoreInfos, signalSemaphoreInfos, m_InFlightFences[m_CurrentFrame]);
 }
 
 void App::Present(uint32_t imageIndex)

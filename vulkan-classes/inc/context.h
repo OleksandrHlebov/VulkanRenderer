@@ -19,7 +19,6 @@ struct Context
 	vkb::Device                Device;
 	vkb::DispatchTable         DispatchTable;
 	vkb::Swapchain             Swapchain;
-	VkCommandPool              CommandPool{};
 
 	VkQueue GraphicsQueue{};
 	VkQueue PresentQueue{};

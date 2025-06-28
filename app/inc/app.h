@@ -8,6 +8,8 @@
 #include "descriptor_set.h"
 #include "VkBootstrap.h"
 
+class CommandPool;
+class CommandBuffer;
 class DescriptorPool;
 class DescriptorSetLayout;
 class ImageView;
@@ -32,9 +34,6 @@ public:
 	void Run();
 
 private:
-	// TODO: specialisation
-	[[nodiscard]] VkShaderModule CreateShaderModule(std::vector<char> code) const;
-
 	void CreateWindow(int width, int height);
 	void CreateInstance();
 	void CreateSurface();
@@ -48,10 +47,9 @@ private:
 	void CreateDescriptorSetLayouts();
 	void CreateResources();
 	void CreateDepth();
-	void CreateCommandBuffers();
 	void RecreateSwapchain();
-	void RecordCommandBuffer(VkCommandBuffer commandBuffer, size_t imageIndex);
-	void Submit() const;
+	void RecordCommandBuffer(CommandBuffer& commandBuffer, size_t imageIndex);
+	void Submit(CommandBuffer& commandBuffer) const;
 	void Present(uint32_t imageIndex);
 	void End();
 
@@ -71,7 +69,7 @@ private:
 	std::vector<Image>     m_SwapchainImages;
 	std::vector<ImageView> m_SwapchainImageViews;
 
-	std::vector<VkCommandBuffer> m_CommandBuffers{};
+	uptr<CommandPool> m_CommandPool{};
 
 	std::vector<Buffer> m_MVPUBOs{};
 
