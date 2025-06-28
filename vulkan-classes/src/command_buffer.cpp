@@ -2,10 +2,11 @@
 
 CommandBuffer::Status CommandBuffer::GetStatus(Context const& context)
 {
+	if (m_Status != Status::Submitted)
+		return m_Status;
 	if (context.DispatchTable.getFenceStatus(m_AssociatedFence != VK_NULL_HANDLE
 											 ? m_AssociatedFence
-											 : m_Fence) == VK_SUCCESS
-		&& m_Status == Status::Submitted)
+											 : m_Fence) == VK_SUCCESS)
 		m_Status = Status::Ready;
 	return m_Status;
 }
