@@ -13,7 +13,8 @@ set(INCLUDE
     inc/pipeline_layout.h
     inc/pipeline.h
     inc/descriptor_set_layout.h
-    inc/descriptor_pool.h)
+    inc/descriptor_pool.h
+    inc/shader_stage.h)
 
 set(SOURCE
     src/main.cpp

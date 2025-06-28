@@ -1,5 +1,7 @@
 #include "pipeline.h"
 
+#include "shader_stage.h"
+
 PipelineBuilder::PipelineBuilder(Context& context)
 	: m_Context{ context }
 {
@@ -32,15 +34,9 @@ PipelineBuilder::PipelineBuilder(Context& context)
 	m_DepthStencilState.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 }
 
-PipelineBuilder& PipelineBuilder::AddShaderStage(VkShaderModule module, VkShaderStageFlagBits stage)
+PipelineBuilder& PipelineBuilder::AddShaderStage(ShaderStage const& shaderStage)
 {
-	VkPipelineShaderStageCreateInfo createInfo{};
-	createInfo.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	createInfo.pNext  = nullptr;
-	createInfo.module = module;
-	createInfo.stage  = stage;
-	createInfo.pName  = "main";
-	m_ShaderStages.emplace_back(createInfo);
+	m_ShaderStages.emplace_back(shaderStage);
 	return *this;
 }
 

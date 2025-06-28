@@ -21,7 +21,8 @@ public:
 		, uint32_t        baseLayer    = 0
 		, uint32_t        layerCount   = 1
 		, uint32_t        baseMipLevel = 0
-		, uint32_t        levelCount   = 1, bool addToQueue = true
+		, uint32_t        levelCount   = 1
+		, bool            addToQueue   = true
 	) const;
 
 	struct Transition

@@ -6,6 +6,7 @@
 #include "helper.h"
 #include "image.h"
 #include "pipeline.h"
+#include "shader_stage.h"
 
 App::App(int width, int height)
 {
@@ -313,8 +314,11 @@ void App::CreateGraphicsPipeline()
 		m_PipelineLayout = std::make_unique<PipelineLayout>(std::move(layout));
 	}
 
-	VkShaderModule const vert = CreateShaderModule(help::ReadFile("shaders/basic_transform.spv"));
-	VkShaderModule const frag = CreateShaderModule(help::ReadFile("shaders/basic_color.spv"));
+	// VkShaderModule const vert = CreateShaderModule(help::ReadFile("shaders/basic_transform.spv"));
+	// VkShaderModule const frag = CreateShaderModule(help::ReadFile("shaders/basic_color.spv"));
+
+	ShaderStage const vert{ m_Context, help::ReadFile("shaders/basic_transform.spv"), VK_SHADER_STAGE_VERTEX_BIT };
+	ShaderStage const frag{ m_Context, help::ReadFile("shaders/basic_color.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
 
 	VkFormat colorAttachmentFormats[]{ m_Context.Swapchain.image_format };
 
@@ -330,13 +334,10 @@ void App::CreateGraphicsPipeline()
 						.SetRenderingAttachments(colorAttachmentFormats, m_DepthFormat, VK_FORMAT_UNDEFINED)
 						.EnableDepthTest(VK_COMPARE_OP_LESS_OR_EQUAL)
 						.EnableDepthWrite()
-						.AddShaderStage(vert, VK_SHADER_STAGE_VERTEX_BIT)
-						.AddShaderStage(frag, VK_SHADER_STAGE_FRAGMENT_BIT)
+						.AddShaderStage(vert)
+						.AddShaderStage(frag)
 						.Build(*m_PipelineLayout, true);
 	m_Pipeline = std::make_unique<Pipeline>(std::move(pipeline));
-
-	m_Context.DispatchTable.destroyShaderModule(vert, nullptr);
-	m_Context.DispatchTable.destroyShaderModule(frag, nullptr);
 }
 
 void App::CreateCmdPool()

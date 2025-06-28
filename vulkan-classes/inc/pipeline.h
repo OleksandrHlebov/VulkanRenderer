@@ -4,6 +4,7 @@
 #include <span>
 
 #include "pipeline_layout.h"
+#include "shader_stage.h"
 
 class Pipeline final
 {
@@ -46,7 +47,7 @@ public:
 	PipelineBuilder& operator=(PipelineBuilder&&)      = delete;
 	PipelineBuilder& operator=(PipelineBuilder const&) = delete;
 
-	PipelineBuilder& AddShaderStage(VkShaderModule module, VkShaderStageFlagBits stage);
+	PipelineBuilder& AddShaderStage(ShaderStage const& shaderStage);
 
 	PipelineBuilder& SetRenderingAttachments(std::span<VkFormat> colorAttachmentFormats, VkFormat depthFormat, VkFormat stencilFormat);
 
