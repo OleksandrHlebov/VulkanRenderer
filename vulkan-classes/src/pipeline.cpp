@@ -53,13 +53,14 @@ PipelineBuilder& PipelineBuilder::SetRenderingAttachments
 }
 
 PipelineBuilder& PipelineBuilder::SetVertexDescription
-(VkVertexInputBindingDescription const* bindingDesc, VkVertexInputAttributeDescription const* attributeDesc, uint32_t attributes)
+(std::span<VkVertexInputBindingDescription> bindingDesc, std::span<VkVertexInputAttributeDescription> attributeDesc)
 {
 	m_VertexInputState.sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 	m_VertexInputState.pNext                           = nullptr;
-	m_VertexInputState.vertexAttributeDescriptionCount = attributes;
-	m_VertexInputState.pVertexAttributeDescriptions    = attributeDesc;
-	m_VertexInputState.pVertexBindingDescriptions      = bindingDesc;
+	m_VertexInputState.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDesc.size());
+	m_VertexInputState.pVertexAttributeDescriptions    = attributeDesc.data();
+	m_VertexInputState.vertexBindingDescriptionCount   = static_cast<uint32_t>(bindingDesc.size());
+	m_VertexInputState.pVertexBindingDescriptions      = bindingDesc.data();
 
 	return *this;
 }

@@ -23,6 +23,8 @@ public:
 
 	[[nodiscard]] Status GetStatus(Context const& context);
 
+	[[nodiscard]] VkFence const& GetFence() const;
+
 	void Begin(Context const& context, VkCommandBufferUsageFlags usage = 0);
 
 	void End(Context const& context);

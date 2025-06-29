@@ -42,6 +42,7 @@ private:
 	void CreateSyncObjects();
 	void CreateDescriptorPool();
 	void CreateDescriptorSets();
+	void CreateVertexBuffer();
 	void CreateGraphicsPipeline();
 	void CreateCmdPool();
 	void CreateDescriptorSetLayouts();
@@ -71,6 +72,7 @@ private:
 
 	uptr<CommandPool> m_CommandPool{};
 
+	uptr<Buffer>        m_VertexBuffer{};
 	std::vector<Buffer> m_MVPUBOs{};
 
 	std::vector<DescriptorSet> m_FrameDescriptorSets{};

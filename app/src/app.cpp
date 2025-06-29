@@ -35,6 +35,7 @@ App::App(int width, int height)
 	});
 	CreateCmdPool();
 	// TODO: Load scene
+	CreateVertexBuffer();
 	CreateDescriptorSetLayouts();
 	// TODO: Create resources (depth/textures)
 	CreateResources();
@@ -288,6 +289,37 @@ void App::CreateDescriptorSets()
 	}
 }
 
+void App::CreateVertexBuffer()
+{
+	Vertex constexpr vertices[]{
+		{ glm::vec3{ .0f, .5f, 1.f } }
+		, { glm::vec3{ -.5f, -.5f, 1.f } }
+		, { glm::vec3{ .5f, -.5f, 1.f } }
+	};
+
+	BufferBuilder stagingBufferBuilder{ m_Context };
+	Buffer        stagingBuffer = stagingBufferBuilder
+						   .SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+						   .Build(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, sizeof(vertices), true);
+	stagingBuffer.UpdateData(vertices);
+	BufferBuilder bufferBuilder{ m_Context };
+	Buffer        buffer = bufferBuilder
+					.SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+					.Build(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, sizeof(vertices));
+
+	CommandBuffer& commandBuffer = m_CommandPool->AllocateCommandBuffer(m_Context);
+	commandBuffer.Begin(m_Context);
+	stagingBuffer.CopyTo(m_Context, commandBuffer, buffer);
+	commandBuffer.End(m_Context);
+	commandBuffer.Submit(m_Context, m_Context.GraphicsQueue, {}, {});
+
+	if (auto const result = m_Context.DispatchTable.waitForFences(1, &commandBuffer.GetFence(), VK_TRUE, UINT64_MAX);
+		result != VK_SUCCESS)
+		throw std::runtime_error("Failed to wait for the fences");
+
+	m_VertexBuffer = std::make_unique<Buffer>(std::move(buffer));
+}
+
 void App::CreateGraphicsPipeline()
 {
 	// default layout
@@ -311,6 +343,7 @@ void App::CreateGraphicsPipeline()
 						.SetPolygonMode(VK_POLYGON_MODE_FILL)
 						.SetCullMode(VK_CULL_MODE_BACK_BIT)
 						.SetFrontFace(VK_FRONT_FACE_CLOCKWISE)
+						.SetVertexDescription(Vertex::GetBindingDescription(), Vertex::GetAttributeDescription())
 						.AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT)
 						.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR)
 						.SetRenderingAttachments(colorAttachmentFormats, m_DepthFormat, VK_FORMAT_UNDEFINED)
@@ -458,6 +491,13 @@ void App::RecordCommandBuffer(CommandBuffer& commandBuffer, size_t imageIndex)
 													  , 0
 													  , nullptr);
 
+		VkDeviceSize offsets[] = { {} };
+		m_Context.DispatchTable.cmdBindVertexBuffers(commandBuffer
+													 , 0
+													 , 1
+													 , *m_VertexBuffer
+													 , offsets);
+
 		VkViewport viewport{};
 		viewport.width    = static_cast<float>(m_Context.Swapchain.extent.width);
 		viewport.height   = static_cast<float>(m_Context.Swapchain.extent.height);
@@ -472,7 +512,7 @@ void App::RecordCommandBuffer(CommandBuffer& commandBuffer, size_t imageIndex)
 
 		m_Context.DispatchTable.cmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-		m_Context.DispatchTable.cmdDraw(commandBuffer, 3, 1, 0, 0);
+		m_Context.DispatchTable.cmdDraw(commandBuffer, static_cast<uint32_t>(m_VertexBuffer->GetSize() / sizeof(Vertex)), 1, 0, 0);
 	}
 	m_Context.DispatchTable.cmdEndRendering(commandBuffer);
 

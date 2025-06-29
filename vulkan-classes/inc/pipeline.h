@@ -52,7 +52,7 @@ public:
 	PipelineBuilder& SetRenderingAttachments(std::span<VkFormat> colorAttachmentFormats, VkFormat depthFormat, VkFormat stencilFormat);
 
 	PipelineBuilder& SetVertexDescription
-	(VkVertexInputBindingDescription const* bindingDesc, VkVertexInputAttributeDescription const* attributeDesc, uint32_t attributes);
+	(std::span<VkVertexInputBindingDescription> bindingDesc, std::span<VkVertexInputAttributeDescription> attributeDesc);
 
 	PipelineBuilder& SetTopology(VkPrimitiveTopology topology);
 

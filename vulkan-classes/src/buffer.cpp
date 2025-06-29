@@ -1,5 +1,50 @@
 #include "buffer.h"
 
+void Buffer::CopyTo(Context const& context, CommandBuffer const& commandBuffer, Buffer const& dst) const
+{
+	assert(this->GetSize() == dst.GetSize());
+
+	VkBufferCopy2 copyRegion{};
+	copyRegion.sType     = VK_STRUCTURE_TYPE_BUFFER_COPY_2;
+	copyRegion.srcOffset = 0;
+	copyRegion.dstOffset = 0;
+	copyRegion.size      = this->GetSize();
+
+	VkCopyBufferInfo2 info{};
+	info.sType       = VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2;
+	info.srcBuffer   = *this;
+	info.dstBuffer   = dst;
+	info.regionCount = 1;
+	info.pRegions    = &copyRegion;
+
+	context.DispatchTable.cmdCopyBuffer2(commandBuffer, &info);
+}
+
+void Buffer::CopyTo(Context const& context, CommandBuffer const& commandBuffer, Image const& dst) const
+{
+	VkBufferImageCopy2 copyRegion{};
+	copyRegion.sType             = VK_STRUCTURE_TYPE_BUFFER_COPY_2;
+	copyRegion.bufferOffset      = 0;
+	copyRegion.bufferRowLength   = 0;
+	copyRegion.bufferImageHeight = 0;
+
+	copyRegion.imageExtent                     = VkExtent3D{ dst.GetExtent().width, dst.GetExtent().height, 1 };
+	copyRegion.imageOffset                     = VkOffset3D{};
+	copyRegion.imageSubresource.aspectMask     = dst.GetAspect();
+	copyRegion.imageSubresource.layerCount     = dst.GetLayerCount();
+	copyRegion.imageSubresource.mipLevel       = dst.GetMipLevelCount();
+	copyRegion.imageSubresource.baseArrayLayer = 0;
+
+	VkCopyBufferToImageInfo2 copyImageInfo{};
+	copyImageInfo.sType          = VK_STRUCTURE_TYPE_COPY_IMAGE_INFO_2;
+	copyImageInfo.dstImage       = dst;
+	copyImageInfo.dstImageLayout = dst.GetLayout();
+	copyImageInfo.srcBuffer      = *this;
+	copyImageInfo.regionCount    = 1;
+	copyImageInfo.pRegions       = &copyRegion;
+	context.DispatchTable.cmdCopyBufferToImage2(commandBuffer, &copyImageInfo);
+}
+
 BufferBuilder::BufferBuilder(Context& context)
 	: m_Context{ context }
 {
@@ -41,9 +86,11 @@ Buffer BufferBuilder::Build(VkBufferUsageFlags usage, VkDeviceSize size, bool ma
 	if (addToQueue)
 		m_Context.DeletionQueue.Push([context = &m_Context
 										 , buffer = buffer.m_Buffer
-										 , allocation = buffer.m_Allocation]
+										 , allocation = buffer.m_Allocation
+										 , mapped = buffer.m_Data != nullptr]
 									 {
-										 vmaUnmapMemory(context->Allocator, allocation);
+										 if (mapped)
+											 vmaUnmapMemory(context->Allocator, allocation);
 										 vmaDestroyBuffer(context->Allocator, buffer, allocation);
 									 });
 

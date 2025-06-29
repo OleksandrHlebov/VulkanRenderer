@@ -1,7 +1,9 @@
 #ifndef BUFFER_H
 #define BUFFER_H
 
+#include "command_buffer.h"
 #include "context.h"
+#include "image.h"
 
 class Buffer final
 {
@@ -24,6 +26,10 @@ public:
 		assert(m_Data);
 		memcpy(m_Data, &data, sizeof(DataType));
 	}
+
+	void CopyTo(Context const& context, CommandBuffer const& commandBuffer, Buffer const& dst) const;
+
+	void CopyTo(Context const& context, CommandBuffer const& commandBuffer, Image const& dst) const;
 
 	operator VkBuffer() const
 	{

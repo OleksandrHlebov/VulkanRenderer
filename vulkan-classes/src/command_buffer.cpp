@@ -11,6 +11,11 @@ CommandBuffer::Status CommandBuffer::GetStatus(Context const& context)
 	return m_Status;
 }
 
+VkFence const& CommandBuffer::GetFence() const
+{
+	return m_Fence;
+}
+
 void CommandBuffer::Begin(Context const& context, VkCommandBufferUsageFlags usage)
 {
 	assert(m_Status == Status::Ready);
@@ -39,6 +44,11 @@ void CommandBuffer::Submit
 {
 	assert(m_Status == Status::Executable);
 	m_AssociatedFence = waitFence;
+
+	if (m_AssociatedFence == VK_NULL_HANDLE)
+		if (auto const result = context.DispatchTable.resetFences(1, &m_Fence);
+			result != VK_SUCCESS)
+			throw std::runtime_error("Failed to reset command buffer internal fence");
 
 	VkCommandBufferSubmitInfo commandBufferSubmitInfo{};
 	commandBufferSubmitInfo.sType         = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;

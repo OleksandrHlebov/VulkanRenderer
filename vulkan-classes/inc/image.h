@@ -60,6 +60,26 @@ public:
 		return m_Allocation;
 	}
 
+	[[nodiscard]] VkExtent2D const& GetExtent() const
+	{
+		return m_Extent;
+	}
+
+	[[nodiscard]] VkImageAspectFlags GetAspect() const
+	{
+		return m_AspectFlags;
+	}
+
+	[[nodiscard]] uint32_t GetLayerCount() const
+	{
+		return m_Layers;
+	}
+
+	[[nodiscard]] uint32_t GetMipLevelCount() const
+	{
+		return m_MipLevels;
+	}
+
 	static void ConvertFromSwapchainVkImages(Context& context, std::vector<Image>& convertedImages);
 
 	operator VkImage() const
