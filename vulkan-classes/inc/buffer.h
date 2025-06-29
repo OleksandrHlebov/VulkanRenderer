@@ -75,12 +75,15 @@ public:
 
 	BufferBuilder& SetRequiredMemoryFlags(VkMemoryPropertyFlags flags);
 
-	[[nodiscard]] Buffer Build(VkBufferUsageFlags usage, VkDeviceSize size, bool mapMemory = false, bool addToQueue = true);
+	BufferBuilder& MapMemory(bool map = true);
+
+	[[nodiscard]] Buffer Build(VkBufferUsageFlags usage, VkDeviceSize size, bool addToQueue = true);
 
 private:
 	Context&                m_Context;
 	VkBufferCreateInfo      m_BufferCreateInfo{};
 	VmaAllocationCreateInfo m_AllocationCreateInfo{};
+	bool                    m_MapMemory{ false };
 };
 
 #endif //BUFFER_H

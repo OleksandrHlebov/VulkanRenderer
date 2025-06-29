@@ -9,6 +9,8 @@
 #include "pipeline.h"
 #include "shader_stage.h"
 
+#include <span>
+
 App::App(int width, int height)
 {
 	m_Camera = std::make_unique<Camera>(glm::vec3(.0f, .0f, .0f)
@@ -300,7 +302,8 @@ void App::CreateVertexBuffer()
 	BufferBuilder stagingBufferBuilder{ m_Context };
 	Buffer        stagingBuffer = stagingBufferBuilder
 						   .SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
-						   .Build(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, sizeof(vertices), true);
+						   .MapMemory()
+						   .Build(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, sizeof(vertices));
 	stagingBuffer.UpdateData(vertices);
 	BufferBuilder bufferBuilder{ m_Context };
 	Buffer        buffer = bufferBuilder
@@ -378,10 +381,10 @@ void App::CreateResources()
 	// mvp ubo
 	{
 		BufferBuilder builder{ m_Context };
-		builder.SetMemoryUsage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+		builder.MapMemory().SetMemoryUsage(VMA_MEMORY_USAGE_CPU_TO_GPU);
 
 		for (uint32_t index{}; index < m_FramesInFlight; ++index)
-			m_MVPUBOs.emplace_back(builder.Build(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, sizeof(ModelViewProj), true));
+			m_MVPUBOs.emplace_back(builder.Build(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, sizeof(ModelViewProj)));
 	}
 	CreateDepth();
 }
