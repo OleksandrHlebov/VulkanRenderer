@@ -42,9 +42,12 @@ jobs:
         shell: bash
         run: echo "C:/Program Files/mingw-w64/mingw64/bin" >> $GITHUB_PATH
 
+      - name: Install Ninja
+        run: choco install ninja
+
       - name: Configure CMake
         shell: cmd
-        run: cmake -B build -G "${{ matrix.compiler == 'msvc' && 'NMake Makefiles' || 'MinGW Makefiles' }}" -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DVulkan_INCLUDE_DIR=%VULKAN_SDK%/Include -DVulkan_LIBRARY=%VULKAN_SDK%/Lib/vulkan-1.lib
+        run: cmake -B build -G "Ninja" -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DVulkan_INCLUDE_DIR=%VULKAN_SDK%/Include -DVulkan_LIBRARY=%VULKAN_SDK%/Lib/vulkan-1.lib
 
       - name: Build
         shell: cmd
