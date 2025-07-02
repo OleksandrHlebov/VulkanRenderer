@@ -8,6 +8,7 @@
 
 #include "command_pool.h"
 #include "context.h"
+#include "assimp/material.h"
 
 struct aiNode;
 struct aiScene;
@@ -33,8 +34,19 @@ public:
 		return m_Meshes;
 	}
 
+	[[nodiscard]] std::list<Image> const& GetTextureImages() const
+	{
+		return m_TextureImages;
+	}
+
+	[[nodiscard]] std::list<ImageView> const& GetTextureImageViews() const
+	{
+		return m_TextureImageViews;
+	}
+
 private:
-	void ProcessNode(aiNode const* node, aiScene const* scene, CommandBuffer& commandBuffer);
+	void     ProcessNode(aiNode const* node, aiScene const* scene, CommandBuffer& commandBuffer);
+	uint32_t LoadTexture(aiTextureType, aiMaterial const* material);
 
 	Context&     m_Context;
 	CommandPool& m_CommandPool;
@@ -42,6 +54,10 @@ private:
 	std::list<Buffer> m_StagingBuffers;
 
 	std::list<Mesh> m_Meshes;
+
+	std::list<Image>                          m_TextureImages;
+	std::list<ImageView>                      m_TextureImageViews;
+	std::unordered_map<std::string, uint32_t> m_LoadedTextures;
 
 	glm::vec3 m_AABBMin{ FLT_MAX };
 	glm::vec3 m_AABBMax{ FLT_MIN };

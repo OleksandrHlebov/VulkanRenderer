@@ -1,20 +1,19 @@
 #version 450
 
 layout (location = 0) in vec3 inPosition;
+layout (location = 1) in vec2 inUV;
 
-layout (location = 0) out vec3 outColor;
+layout (location = 0) out vec2 outUV;
 
-layout (binding = 0) uniform ModelViewProjection
+layout (set = 1, binding = 0) uniform ModelViewProjection
 {
     mat4 Model;
     mat4 View;
     mat4 Projection;
 } mvp;
 
-vec3 colors[3] = vec3[](vec3(1., .0, .0), vec3(.0, 1., .0), vec3(.0, .0, 1.));
-
 void main()
 {
     gl_Position = mvp.Projection * mvp.View * mvp.Model * vec4(inPosition, 1.);
-    outColor = colors[gl_VertexIndex % 3];
+    outUV = inUV;
 }

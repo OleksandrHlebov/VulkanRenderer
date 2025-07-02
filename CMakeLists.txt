@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.31)
 project(VulkanResearch)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 
 include(FetchContent)
 set(EXTERNAL_LIBS)
@@ -34,12 +34,17 @@ list(APPEND EXTERNAL_LIBS glm)
 FetchContent_Declare(
 		assimp
 		URL https://github.com/assimp/assimp/archive/refs/tags/v6.0.2.tar.gz)
-FetchContent_MakeAvailable(assimp)
-list(APPEND EXTERNAL_LIBS glm)
-set(ASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT OFF)
-set(ASSIMP_BUILD_ALL_EXPORTERS_BY_DEFAULT OFF)
 set(ASSIMP_BUILD_TESTS OFF)
 set(ASSIMP_BUILD_ASSIMP_VIEW OFF)
+FetchContent_MakeAvailable(assimp)
+list(APPEND EXTERNAL_LIBS glm)
+
+FetchContent_Declare(
+		stb
+		GIT_REPOSITORY https://github.com/nothings/stb.git
+		GIT_TAG master)
+FetchContent_MakeAvailable(stb)
+
 find_package(Vulkan REQUIRED)
 
 add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/W4>

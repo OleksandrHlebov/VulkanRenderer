@@ -12,9 +12,15 @@ struct ModelViewProj
 	glm::mat4 proj;
 };
 
+struct TextureIndices
+{
+	uint32_t Diffuse;
+};
+
 struct Vertex
 {
-	alignas(16)glm::vec3 position;
+	glm::vec3 Position;
+	glm::vec2 UV;
 
 	static std::span<VkVertexInputBindingDescription> GetBindingDescription()
 	{
@@ -32,13 +38,19 @@ struct Vertex
 
 	static std::span<VkVertexInputAttributeDescription> GetAttributeDescription()
 	{
-		static VkVertexInputAttributeDescription attributeDescriptions[1]
+		static VkVertexInputAttributeDescription attributeDescriptions[]
 		{
 			{
 				.location = 0
 				, .binding = 0
 				, .format = VK_FORMAT_R32G32B32_SFLOAT
-				, .offset = offsetof(Vertex, position)
+				, .offset = offsetof(Vertex, Position)
+			}
+			, {
+				.location = 1
+				, .binding = 0
+				, .format = VK_FORMAT_R32G32_SFLOAT
+				, .offset = offsetof(Vertex, UV)
 			}
 		};
 

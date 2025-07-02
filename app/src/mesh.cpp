@@ -9,6 +9,7 @@ Mesh::Mesh
 	, CommandBuffer const&    commandBuffer
 	, std::vector<Vertex>&&   vertices, Buffer const& stagingVert
 	, std::vector<uint32_t>&& indices, Buffer const&  stagingIndex
+	, TextureIndices&&        textureIndices
 )
 	: m_Vertices(std::move(vertices))
 	, m_VertexBuffer(BufferBuilder{ context }
@@ -20,6 +21,7 @@ Mesh::Mesh
 					.SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
 					.Build(VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
 						   , m_Indices.size() * sizeof(m_Indices[0])))
+	, m_TextureIndices(std::move(textureIndices))
 {
 	stagingVert.CopyTo(context, commandBuffer, m_VertexBuffer);
 	stagingIndex.CopyTo(context, commandBuffer, m_IndexBuffer);

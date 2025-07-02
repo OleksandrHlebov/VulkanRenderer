@@ -5,17 +5,17 @@
 #include "buffer.h"
 #include "context.h"
 #include "camera.h"
+#include "pipeline.h"
 #include "descriptor_set.h"
+#include "descriptor_pool.h"
+#include "descriptor_set_layout.h"
 #include "VkBootstrap.h"
 
 class Scene;
 class CommandPool;
 class CommandBuffer;
-class DescriptorPool;
-class DescriptorSetLayout;
 class ImageView;
 class Image;
-class Pipeline;
 class PipelineLayout;
 
 class App final
@@ -60,6 +60,7 @@ private:
 	uptr<Scene> m_Scene;
 
 	uptr<DescriptorSetLayout> m_FrameDescSetLayout{};
+	uptr<DescriptorSetLayout> m_GlobalDescSetLayout{};
 	uptr<DescriptorPool>      m_DescPool{};
 
 	uptr<PipelineLayout> m_PipelineLayout;
@@ -69,6 +70,8 @@ private:
 	uptr<Image>     m_DepthImage{};
 	uptr<ImageView> m_DepthImageView{};
 
+	VkSampler m_TextureSampler{};
+
 	std::vector<Image>     m_SwapchainImages;
 	std::vector<ImageView> m_SwapchainImageViews;
 
@@ -77,6 +80,7 @@ private:
 	std::vector<Buffer> m_MVPUBOs{};
 
 	std::vector<DescriptorSet> m_FrameDescriptorSets{};
+	std::vector<DescriptorSet> m_GlobalDescriptorSets{};
 
 	std::vector<VkSemaphore> m_ImageAvailableSemaphores{};
 	std::vector<VkSemaphore> m_RenderFinishedSemaphores{};

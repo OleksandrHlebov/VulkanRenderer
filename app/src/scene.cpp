@@ -55,17 +55,18 @@ void Scene::ProcessNode(aiNode const* node, aiScene const* scene, CommandBuffer&
 			aiVector3D const aiPosition = transform * mesh->mVertices[vertexIndex];
 
 			Vertex tempVertex{};
-			tempVertex.position = glm::vec3(aiPosition.x, aiPosition.y, aiPosition.z);
+			tempVertex.Position = glm::vec3(aiPosition.x, aiPosition.y, aiPosition.z);
+			tempVertex.UV       = glm::vec2(mesh->mTextureCoords[0][vertexIndex].x, mesh->mTextureCoords[0][vertexIndex].y);
 
 			// TODO: normals, tangent, bitangent
 
-			m_AABBMin.x = std::min(m_AABBMin.x, tempVertex.position.x);
-			m_AABBMin.y = std::min(m_AABBMin.y, tempVertex.position.y);
-			m_AABBMin.z = std::min(m_AABBMin.z, tempVertex.position.z);
+			m_AABBMin.x = std::min(m_AABBMin.x, tempVertex.Position.x);
+			m_AABBMin.y = std::min(m_AABBMin.y, tempVertex.Position.y);
+			m_AABBMin.z = std::min(m_AABBMin.z, tempVertex.Position.z);
 
-			m_AABBMax.x = std::max(m_AABBMax.x, tempVertex.position.x);
-			m_AABBMax.y = std::max(m_AABBMax.y, tempVertex.position.y);
-			m_AABBMax.z = std::max(m_AABBMax.z, tempVertex.position.z);
+			m_AABBMax.x = std::max(m_AABBMax.x, tempVertex.Position.x);
+			m_AABBMax.y = std::max(m_AABBMax.y, tempVertex.Position.y);
+			m_AABBMax.z = std::max(m_AABBMax.z, tempVertex.Position.z);
 
 			tempVertices.push_back(tempVertex);
 		}
@@ -76,8 +77,9 @@ void Scene::ProcessNode(aiNode const* node, aiScene const* scene, CommandBuffer&
 				tempIndices.push_back(face.mIndices[index]);
 		}
 		// TODO: materials
-
-		Buffer& stagingVert = m_StagingBuffers.emplace_back(BufferBuilder{ m_Context }
+		TextureIndices textureIndices{};
+		textureIndices.Diffuse = LoadTexture(aiTextureType_DIFFUSE, scene->mMaterials[mesh->mMaterialIndex]);
+		Buffer& stagingVert    = m_StagingBuffers.emplace_back(BufferBuilder{ m_Context }
 															.MapMemory()
 															.SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
 																					VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
@@ -93,8 +95,36 @@ void Scene::ProcessNode(aiNode const* node, aiScene const* scene, CommandBuffer&
 																	, tempIndices.size() * sizeof(tempIndices[0])));
 		stagingIndex.UpdateData(tempIndices);
 
-		m_Meshes.emplace_back(m_Context, commandBuffer, std::move(tempVertices), stagingVert, std::move(tempIndices), stagingIndex);
+		m_Meshes.emplace_back(m_Context
+							  , commandBuffer
+							  , std::move(tempVertices)
+							  , stagingVert
+							  , std::move(tempIndices)
+							  , stagingIndex
+							  , std::move(textureIndices));
 	}
 	for (uint32_t index{}; index < node->mNumChildren; index++)
 		ProcessNode(node->mChildren[index], scene, commandBuffer);
+}
+
+uint32_t Scene::LoadTexture(aiTextureType type, aiMaterial const* material)
+{
+	aiString str;
+	if (material->GetTextureCount(type))
+		material->GetTexture(type, 0, &str);
+	else
+		str = aiString{ "data/textures/200px-Debugempty.png" };
+
+	if (!m_LoadedTextures.contains(str.C_Str()))
+	{
+		ImageBuilder builder{ m_Context };
+
+		Image const& image = m_TextureImages.emplace_back(builder
+														  .SetType(VK_IMAGE_TYPE_2D)
+														  .SetFileName("data/textures/" + std::string{ str.C_Str() }, m_CommandPool)
+														  .Build(VK_IMAGE_USAGE_SAMPLED_BIT));
+		m_TextureImageViews.emplace_back(image.CreateView(m_Context, VK_IMAGE_VIEW_TYPE_2D));
+		m_LoadedTextures[str.C_Str()] = static_cast<uint32_t>(m_TextureImages.size() - 1);
+	}
+	return m_LoadedTextures[str.C_Str()];
 }

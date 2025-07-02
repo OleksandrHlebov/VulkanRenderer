@@ -17,6 +17,7 @@ public:
 		, CommandBuffer const&    commandBuffer
 		, std::vector<Vertex>&&   vertices, Buffer const& stagingVert
 		, std::vector<uint32_t>&& indices, Buffer const&  stagingIndex
+		, TextureIndices&&        textureIndices
 	);
 	~Mesh() = default;
 
@@ -47,6 +48,11 @@ public:
 
 	void Scale(glm::vec3 const& scale);
 
+	[[nodiscard]] TextureIndices const& GetTextureIndices() const
+	{
+		return m_TextureIndices;
+	}
+
 	glm::mat4 GetModelMatrix();
 
 private:
@@ -55,12 +61,15 @@ private:
 	glm::vec3 m_Scale{};
 	glm::mat4 m_ModelMatrix{};
 
-	std::vector<Vertex>   m_Vertices;
-	std::vector<uint32_t> m_Indices;
+	std::vector<Vertex> m_Vertices;
+	Buffer              m_VertexBuffer;
 
-	Buffer m_VertexBuffer;
-	Buffer m_IndexBuffer;
-	bool   m_ModelChanged{ false };
+	std::vector<uint32_t> m_Indices;
+	Buffer                m_IndexBuffer;
+
+	TextureIndices m_TextureIndices;
+
+	bool m_ModelChanged{ false };
 };
 
 #endif //MESH_H

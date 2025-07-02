@@ -2,14 +2,12 @@
 
 #include "command_pool.h"
 #include "datatypes.h"
-#include "descriptor_pool.h"
-#include "descriptor_set_layout.h"
 #include "helper.h"
 #include "image.h"
-#include "pipeline.h"
 #include "shader_stage.h"
 
 #include <span>
+#include <ranges>
 
 #include "scene.h"
 
@@ -151,7 +149,8 @@ void App::CreateDevice()
 	VkPhysicalDeviceVulkan11Features features11{};
 	features11.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
 	VkPhysicalDeviceVulkan12Features features12{};
-	features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+	features12.sType                                     = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+	features12.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
 	VkPhysicalDeviceVulkan13Features features13{};
 	features13.sType            = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
 	features13.dynamicRendering = VK_TRUE;
@@ -267,31 +266,68 @@ void App::CreateDescriptorPool()
 {
 	DescriptorPoolBuilder builder{ m_Context };
 	DescriptorPool        pool = builder
-						  .AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, m_FramesInFlight)
-						  .Build(m_FramesInFlight);
+						  .AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, m_FramesInFlight) // mvp
+						  .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLER, m_FramesInFlight)        // sampler
+						  .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)
+						  .Build(2 * m_FramesInFlight);
 
 	m_DescPool = std::make_unique<DescriptorPool>(std::move(pool));
 }
 
 void App::CreateDescriptorSets()
 {
-	std::vector<VkDescriptorSetLayout> layouts(m_FramesInFlight, *m_FrameDescSetLayout);
-
-	DescriptorSetBuilder const builder{ m_Context };
-	m_FrameDescriptorSets = builder.Build(*m_DescPool, layouts);
-
-	for (uint32_t index{}; index < m_FramesInFlight; ++index)
+	//
 	{
-		VkDescriptorBufferInfo bufferInfo{};
-		bufferInfo.buffer = m_MVPUBOs[index];
-		bufferInfo.range  = VK_WHOLE_SIZE;
-		bufferInfo.offset = 0;
+		std::vector<VkDescriptorSetLayout> layouts(m_FramesInFlight, *m_FrameDescSetLayout);
 
-		VkDescriptorBufferInfo infos[]{ bufferInfo };
+		DescriptorSetBuilder const builder{ m_Context };
+		m_FrameDescriptorSets = builder.Build(*m_DescPool, layouts);
 
-		m_FrameDescriptorSets[index]
-			.AddWriteDescriptor(infos, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, 0)
-			.Update(m_Context);
+		for (uint32_t index{}; index < m_FramesInFlight; ++index)
+		{
+			VkDescriptorBufferInfo bufferInfo{};
+			bufferInfo.buffer = m_MVPUBOs[index];
+			bufferInfo.range  = VK_WHOLE_SIZE;
+			bufferInfo.offset = 0;
+
+			VkDescriptorBufferInfo infos[]{ bufferInfo };
+
+			m_FrameDescriptorSets[index]
+				.AddWriteDescriptor(infos, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, 0)
+				.Update(m_Context);
+		}
+	}
+	//
+	{
+		std::vector<VkDescriptorSetLayout> layouts(m_FramesInFlight, *m_GlobalDescSetLayout);
+
+		DescriptorSetBuilder const builder{ m_Context };
+		m_GlobalDescriptorSets = builder.Build(*m_DescPool, layouts);
+
+		VkDescriptorImageInfo samplerInfo[]{ {} };
+		samplerInfo[0].sampler     = m_TextureSampler;
+		samplerInfo[0].imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		samplerInfo[0].imageView   = VK_NULL_HANDLE;
+
+		auto const& textures      = m_Scene->GetTextureImages();
+		auto const& textureImages = m_Scene->GetTextureImageViews();
+
+		std::vector<VkDescriptorImageInfo> imageInfos;
+		imageInfos.reserve(textures.size());
+
+		for (auto [image, view]: std::views::zip(textures, textureImages))
+		{
+			imageInfos.emplace_back(VK_NULL_HANDLE, view, image.GetLayout());
+		}
+
+		for (auto& descriptor: m_GlobalDescriptorSets)
+			descriptor
+				.AddWriteDescriptor(samplerInfo, VK_DESCRIPTOR_TYPE_SAMPLER, 0, 0)
+				.AddWriteDescriptor(imageInfos
+									, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
+									, 1
+									, 0)
+				.Update(m_Context);
 	}
 }
 
@@ -301,7 +337,9 @@ void App::CreateGraphicsPipeline()
 	{
 		PipelineLayoutBuilder builder{ m_Context };
 		PipelineLayout        layout = builder
+								.AddDescriptorSetLayout(*m_GlobalDescSetLayout)
 								.AddDescriptorSetLayout(*m_FrameDescSetLayout)
+								.AddPushConstant(VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(TextureIndices))
 								.Build();
 		m_PipelineLayout = std::make_unique<PipelineLayout>(std::move(layout));
 	}
@@ -340,12 +378,39 @@ void App::CreateCmdPool()
 
 void App::CreateDescriptorSetLayouts()
 {
-	DescriptorSetLayoutBuilder builder{ m_Context };
-	DescriptorSetLayout        layout = builder
-								 .AddBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
-								 .Build();
+	//
+	{
+		DescriptorSetLayoutBuilder builder{ m_Context };
+		DescriptorSetLayout        layout = builder
+									 .AddBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
+									 .Build();
 
-	m_FrameDescSetLayout = std::make_unique<DescriptorSetLayout>(std::move(layout));
+		m_FrameDescSetLayout = std::make_unique<DescriptorSetLayout>(std::move(layout));
+	}
+	//
+	{
+		VkSamplerCreateInfo samplerCreateInfo{};
+		samplerCreateInfo.sType        = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		samplerCreateInfo.minFilter    = VK_FILTER_LINEAR;
+		samplerCreateInfo.magFilter    = VK_FILTER_LINEAR;
+		samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+		m_Context.DispatchTable.createSampler(&samplerCreateInfo, nullptr, &m_TextureSampler);
+
+		m_Context.DeletionQueue.Push([this]
+		{
+			m_Context.DispatchTable.destroySampler(m_TextureSampler, nullptr);
+		});
+
+		DescriptorSetLayoutBuilder builder{ m_Context };
+		DescriptorSetLayout        layout = builder
+									 .AddBinding(0, VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+									 .AddBinding(1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
+									 .Build();
+		m_GlobalDescSetLayout = std::make_unique<DescriptorSetLayout>(std::move(layout));
+	}
 }
 
 void App::CreateResources()
@@ -474,13 +539,15 @@ void App::RecordCommandBuffer(CommandBuffer& commandBuffer, size_t imageIndex)
 
 		m_Context.DispatchTable.cmdSetScissor(commandBuffer, 0, 1, &scissor);
 
+		VkDescriptorSet sets[]{ m_GlobalDescriptorSets[m_CurrentFrame], m_FrameDescriptorSets[m_CurrentFrame] };
+
 		m_Context.DispatchTable.cmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *m_Pipeline);
 		m_Context.DispatchTable.cmdBindDescriptorSets(commandBuffer
 													  , VK_PIPELINE_BIND_POINT_GRAPHICS
 													  , *m_PipelineLayout
 													  , 0
-													  , 1
-													  , m_FrameDescriptorSets[m_CurrentFrame]
+													  , static_cast<uint32_t>(std::size(sets))
+													  , sets
 													  , 0
 													  , nullptr);
 
@@ -497,6 +564,13 @@ void App::RecordCommandBuffer(CommandBuffer& commandBuffer, size_t imageIndex)
 														 , offsets);
 
 			m_Context.DispatchTable.cmdBindIndexBuffer(commandBuffer, mesh.GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+
+			m_Context.DispatchTable.cmdPushConstants(commandBuffer
+													 , *m_PipelineLayout
+													 , VK_SHADER_STAGE_FRAGMENT_BIT
+													 , 0
+													 , sizeof(TextureIndices)
+													 , &mesh.GetTextureIndices());
 
 			m_Context.DispatchTable.cmdDrawIndexed(commandBuffer
 												   , static_cast<uint32_t>(mesh.GetIndexBuffer().GetSize() / sizeof(uint32_t))
