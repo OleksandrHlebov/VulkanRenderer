@@ -29,6 +29,10 @@ jobs:
           vulkan-components: Vulkan-Headers, Vulkan-Loader, SPIRV-Tools, Glslang
           vulkan-use-cache: true
 
+      - name: Install GCC 14
+        run: |
+          choco install mingw --version=14.3.0
+
       - name: Verify glslang is available
         shell: cmd
         run: glslang --version
