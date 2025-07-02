@@ -44,7 +44,7 @@ jobs:
       - name: Add MinGW to PATH
         if: matrix.compiler == 'mingw'
         shell: cmd
-        run: echo "C:/Program Files/mingw-w64/mingw64/bin" >> $GITHUB_PATH
+        run: echo "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin" >> $GITHUB_PATH
 
       - name: Install Ninja
         run: choco install ninja
