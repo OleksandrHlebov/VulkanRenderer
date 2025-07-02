@@ -1,1 +1,1 @@
-[![CMake Windows Matrix Build with Vulkan](https://github.com/OleksandrHlebov/VulkanRenderer/actions/workflows/cmake-single-platform.yml/badge.svg)](https://github.com/OleksandrHlebov/VulkanRenderer/actions/workflows/cmake-single-platform.yml)
+[![CMake Windows Build with Vulkan SDK](https://github.com/OleksandrHlebov/VulkanRenderer/actions/workflows/cmake-single-platform.yml/badge.svg)](https://github.com/OleksandrHlebov/VulkanRenderer/actions/workflows/cmake-single-platform.yml)
