@@ -348,7 +348,8 @@ void App::CreateGraphicsPipeline()
 	}
 
 	ShaderStage const vert{ m_Context, help::ReadFile("shaders/basic_transform.spv"), VK_SHADER_STAGE_VERTEX_BIT };
-	ShaderStage const frag{ m_Context, help::ReadFile("shaders/basic_color.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
+	ShaderStage       frag{ m_Context, help::ReadFile("shaders/basic_color.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
+	frag.AddSpecializationConstant(static_cast<uint32_t>(m_Scene->GetTextureImages().size())); // constant must be 4 bytes in size
 
 	VkFormat colorAttachmentFormats[]{ m_Context.Swapchain.image_format };
 

@@ -58,15 +58,18 @@ public:
 	template<typename DataType>
 	void AddSpecializationConstant(DataType data)
 	{
-		m_MapEntries.emplace_back(m_MapEntries.size(), m_SpecializationData.size(), sizeof(data));
+		uint32_t const offset = static_cast<uint32_t>(m_SpecializationData.size());
+		m_MapEntries.emplace_back(static_cast<uint32_t>(m_MapEntries.size())
+								  , offset
+								  , sizeof(data));
 
 		// char size is 1 byte, hence we allocate sizeof(data) amount of chars
 		m_SpecializationData.insert(m_SpecializationData.end(), sizeof(data), 0);
-		std::memcpy(m_SpecializationData.back(), &data, sizeof(data)); // copy data into the allocated memory
+		std::memcpy(&m_SpecializationData[offset], &data, sizeof(data)); // copy data into the allocated memory
 
-		m_SpecializationInfo.dataSize += sizeof(data);
+		m_SpecializationInfo.dataSize      = static_cast<uint32_t>(m_SpecializationData.size());
 		m_SpecializationInfo.pData         = m_SpecializationData.data();
-		m_SpecializationInfo.mapEntryCount = m_MapEntries.size();
+		m_SpecializationInfo.mapEntryCount = static_cast<uint32_t>(m_MapEntries.size());
 		m_SpecializationInfo.pMapEntries   = m_MapEntries.data();
 
 		m_Info.pSpecializationInfo = &m_SpecializationInfo;
