@@ -1,5 +1,8 @@
 #ifndef IMAGE_H
 #define IMAGE_H
+#include <optional>
+
+#include "command_pool.h"
 #include "context.h"
 #include "image_view.h"
 #include "vma_usage.h"
@@ -135,9 +138,9 @@ public:
 	ImageBuilder& SetMemoryUsage(VmaMemoryUsage memoryUsage);
 	ImageBuilder& SetFlags(VkImageCreateFlags flags);
 	ImageBuilder& SetSharingMode(VkSharingMode sharingMode);
-	ImageBuilder& SetFileName(std::string const& fileName);
+	ImageBuilder& SetFileName(std::string const& fileName, CommandPool& commandPool);
 
-	[[nodiscard]] Image Build(VkImageUsageFlags usage, bool addToQueue = true) const;
+	[[nodiscard]] Image Build(VkImageUsageFlags usage, bool addToQueue = true);
 
 private:
 	Context&           m_Context;
@@ -152,6 +155,8 @@ private:
 	VmaMemoryUsage     m_MemoryUsage{ VMA_MEMORY_USAGE_AUTO };
 	uint32_t           m_Layers{ 1 };
 	uint32_t           m_MipLevels{ 1 };
+
+	CommandPool* m_CommandPool{};
 
 	std::string m_FileName;
 };

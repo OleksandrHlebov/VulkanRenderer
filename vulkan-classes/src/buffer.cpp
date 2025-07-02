@@ -23,7 +23,7 @@ void Buffer::CopyTo(Context const& context, CommandBuffer const& commandBuffer, 
 void Buffer::CopyTo(Context const& context, CommandBuffer const& commandBuffer, Image const& dst) const
 {
 	VkBufferImageCopy2 copyRegion{};
-	copyRegion.sType             = VK_STRUCTURE_TYPE_BUFFER_COPY_2;
+	copyRegion.sType             = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2;
 	copyRegion.bufferOffset      = 0;
 	copyRegion.bufferRowLength   = 0;
 	copyRegion.bufferImageHeight = 0;
@@ -32,11 +32,11 @@ void Buffer::CopyTo(Context const& context, CommandBuffer const& commandBuffer, 
 	copyRegion.imageOffset                     = VkOffset3D{};
 	copyRegion.imageSubresource.aspectMask     = dst.GetAspect();
 	copyRegion.imageSubresource.layerCount     = dst.GetLayerCount();
-	copyRegion.imageSubresource.mipLevel       = dst.GetMipLevelCount();
+	copyRegion.imageSubresource.mipLevel       = 0;
 	copyRegion.imageSubresource.baseArrayLayer = 0;
 
 	VkCopyBufferToImageInfo2 copyImageInfo{};
-	copyImageInfo.sType          = VK_STRUCTURE_TYPE_COPY_IMAGE_INFO_2;
+	copyImageInfo.sType          = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2;
 	copyImageInfo.dstImage       = dst;
 	copyImageInfo.dstImageLayout = dst.GetLayout();
 	copyImageInfo.srcBuffer      = *this;

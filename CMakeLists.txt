@@ -31,6 +31,12 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(glm)
 list(APPEND EXTERNAL_LIBS glm)
 
+FetchContent_Declare(
+		stb
+		GIT_REPOSITORY https://github.com/nothings/stb.git
+		GIT_TAG master)
+FetchContent_MakeAvailable(stb)
+
 find_package(Vulkan REQUIRED)
 
 add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/W4>
