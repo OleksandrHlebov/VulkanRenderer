@@ -1,5 +1,8 @@
 #ifndef DATATYPES_H
 #define DATATYPES_H
+#include <span>
+
+#include "vulkan/vulkan_core.h"
 #include "glm/glm.hpp"
 
 struct ModelViewProj
