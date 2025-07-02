@@ -8,6 +8,7 @@
 #include "descriptor_set.h"
 #include "VkBootstrap.h"
 
+class Scene;
 class CommandPool;
 class CommandBuffer;
 class DescriptorPool;
@@ -42,7 +43,6 @@ private:
 	void CreateSyncObjects();
 	void CreateDescriptorPool();
 	void CreateDescriptorSets();
-	void CreateVertexBuffer();
 	void CreateGraphicsPipeline();
 	void CreateCmdPool();
 	void CreateDescriptorSetLayouts();
@@ -56,6 +56,8 @@ private:
 
 	uptr<Camera> m_Camera;
 	Context      m_Context{};
+
+	uptr<Scene> m_Scene;
 
 	uptr<DescriptorSetLayout> m_FrameDescSetLayout{};
 	uptr<DescriptorPool>      m_DescPool{};
@@ -72,7 +74,6 @@ private:
 
 	uptr<CommandPool> m_CommandPool{};
 
-	uptr<Buffer>        m_VertexBuffer{};
 	std::vector<Buffer> m_MVPUBOs{};
 
 	std::vector<DescriptorSet> m_FrameDescriptorSets{};

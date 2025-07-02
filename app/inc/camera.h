@@ -109,7 +109,7 @@ private
 	glm::vec3 m_Forward{ WORLD_FORWARD };
 	float     m_Fov;
 	float     m_AspectRatio;
-	float     m_Speed{ 2.f };
+	float     m_Speed{ 500.f };
 	float     m_Boost{ 1.f };
 	float     m_Sensitivity{ 0.2f };
 	float     m_Near;

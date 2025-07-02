@@ -22,6 +22,7 @@ macro(Shader_Compile name)
 	                   COMMENT "Compiled ${SHADER_SPIRV_PATH}")
 	list(APPEND COMPILED_SHADERS ${SHADER_SPIRV_PATH})
 endmacro()
+
 set(SHADER_SOURCES
     "basic_color.frag"
     "basic_transform.vert")
@@ -29,11 +30,15 @@ set(SHADER_SOURCES
 set(HEADER
     inc/helper.h
     inc/camera.h
-    inc/world_time.h)
+    inc/world_time.h
+    inc/scene.h
+    inc/mesh.h)
 
 set(SOURCE
     src/app.cpp
-    src/world_time.cpp)
+    src/world_time.cpp
+    src/scene.cpp
+    src/mesh.cpp)
 
 add_library(App STATIC
             ${SOURCE}
@@ -51,11 +56,16 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 
 target_link_libraries(${PROJECT_NAME} PUBLIC
                       VulkanClasses
-                      glm::glm)
+                      glm::glm
+                      assimp::assimp)
 
 foreach (shader IN LISTS SHADER_SOURCES)
 	Shader_Compile(${shader})
 endforeach ()
+
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/data
+                   ${CMAKE_BINARY_DIR}/data)
 
 add_custom_target(CompileShaders DEPENDS ${COMPILED_SHADERS})
 add_dependencies(${PROJECT_NAME} CompileShaders)

@@ -11,13 +11,15 @@
 
 #include <span>
 
+#include "scene.h"
+
 App::App(int width, int height)
 {
 	m_Camera = std::make_unique<Camera>(glm::vec3(.0f, .0f, .0f)
 										, 45.f
 										, static_cast<float>(width) / height // NOLINT(*-narrowing-conversions)
-										, .0f
-										, 100.f);
+										, .01f
+										, 1000.f);
 	CreateWindow(width, height);
 	CreateInstance();
 	CreateSurface();
@@ -37,7 +39,9 @@ App::App(int width, int height)
 	});
 	CreateCmdPool();
 	// TODO: Load scene
-	CreateVertexBuffer();
+	m_Scene = std::make_unique<Scene>(m_Context, *m_CommandPool);
+	m_Scene->LoadScene("data/glTF/Fox.gltf");
+	// CreateVertexBuffer();
 	CreateDescriptorSetLayouts();
 	// TODO: Create resources (depth/textures)
 	CreateResources();
@@ -291,38 +295,6 @@ void App::CreateDescriptorSets()
 	}
 }
 
-void App::CreateVertexBuffer()
-{
-	Vertex constexpr vertices[]{
-		{ glm::vec3{ .0f, .5f, 1.f } }
-		, { glm::vec3{ -.5f, -.5f, 1.f } }
-		, { glm::vec3{ .5f, -.5f, 1.f } }
-	};
-
-	BufferBuilder stagingBufferBuilder{ m_Context };
-	Buffer        stagingBuffer = stagingBufferBuilder
-						   .SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
-						   .MapMemory()
-						   .Build(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, sizeof(vertices));
-	stagingBuffer.UpdateData(vertices);
-	BufferBuilder bufferBuilder{ m_Context };
-	Buffer        buffer = bufferBuilder
-					.SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
-					.Build(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, sizeof(vertices));
-
-	CommandBuffer& commandBuffer = m_CommandPool->AllocateCommandBuffer(m_Context);
-	commandBuffer.Begin(m_Context);
-	stagingBuffer.CopyTo(m_Context, commandBuffer, buffer);
-	commandBuffer.End(m_Context);
-	commandBuffer.Submit(m_Context, m_Context.GraphicsQueue, {}, {});
-
-	if (auto const result = m_Context.DispatchTable.waitForFences(1, &commandBuffer.GetFence(), VK_TRUE, UINT64_MAX);
-		result != VK_SUCCESS)
-		throw std::runtime_error("Failed to wait for the fences");
-
-	m_VertexBuffer = std::make_unique<Buffer>(std::move(buffer));
-}
-
 void App::CreateGraphicsPipeline()
 {
 	// default layout
@@ -345,12 +317,12 @@ void App::CreateGraphicsPipeline()
 						.AddViewport(m_Context.Swapchain.extent)
 						.SetPolygonMode(VK_POLYGON_MODE_FILL)
 						.SetCullMode(VK_CULL_MODE_BACK_BIT)
-						.SetFrontFace(VK_FRONT_FACE_CLOCKWISE)
+						.SetFrontFace(VK_FRONT_FACE_COUNTER_CLOCKWISE)
 						.SetVertexDescription(Vertex::GetBindingDescription(), Vertex::GetAttributeDescription())
 						.AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT)
 						.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR)
 						.SetRenderingAttachments(colorAttachmentFormats, m_DepthFormat, VK_FORMAT_UNDEFINED)
-						.EnableDepthTest(VK_COMPARE_OP_LESS_OR_EQUAL)
+						.EnableDepthTest(VK_COMPARE_OP_LESS)
 						.EnableDepthWrite()
 						.AddShaderStage(vert)
 						.AddShaderStage(frag)
@@ -452,7 +424,7 @@ void App::RecordCommandBuffer(CommandBuffer& commandBuffer, size_t imageIndex)
 			transition.DstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 			transition.SrcStageMask  = VK_PIPELINE_STAGE_2_NONE;
 			transition.DstStageMask  = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT;
-			transition.NewLayout     = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+			transition.NewLayout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		}
 		m_DepthImage->MakeTransition(m_Context, commandBuffer, transition);
 	}
@@ -465,9 +437,13 @@ void App::RecordCommandBuffer(CommandBuffer& commandBuffer, size_t imageIndex)
 	renderingAttachmentInfo.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	renderingAttachmentInfo.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
 
+	VkClearValue clearValue{};
+	clearValue.color        = { { 0.0f, 0.0f, 0.0f, 1.0f } };
+	clearValue.depthStencil = { 1.0f, 0 };
+
 	VkRenderingAttachmentInfo depthAttachmentInfo{};
 	depthAttachmentInfo.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-	depthAttachmentInfo.clearValue  = { .depthStencil = { 1.0f, 0 } };
+	depthAttachmentInfo.clearValue  = clearValue;
 	depthAttachmentInfo.imageLayout = m_DepthImage->GetLayout();
 	depthAttachmentInfo.imageView   = *m_DepthImageView;
 	depthAttachmentInfo.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -484,23 +460,6 @@ void App::RecordCommandBuffer(CommandBuffer& commandBuffer, size_t imageIndex)
 	m_Context.DispatchTable.cmdBeginRendering(commandBuffer, &renderingInfo);
 	// main pass
 	{
-		m_Context.DispatchTable.cmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *m_Pipeline);
-		m_Context.DispatchTable.cmdBindDescriptorSets(commandBuffer
-													  , VK_PIPELINE_BIND_POINT_GRAPHICS
-													  , *m_PipelineLayout
-													  , 0
-													  , 1
-													  , m_FrameDescriptorSets[m_CurrentFrame]
-													  , 0
-													  , nullptr);
-
-		VkDeviceSize offsets[] = { {} };
-		m_Context.DispatchTable.cmdBindVertexBuffers(commandBuffer
-													 , 0
-													 , 1
-													 , *m_VertexBuffer
-													 , offsets);
-
 		VkViewport viewport{};
 		viewport.width    = static_cast<float>(m_Context.Swapchain.extent.width);
 		viewport.height   = static_cast<float>(m_Context.Swapchain.extent.height);
@@ -515,7 +474,37 @@ void App::RecordCommandBuffer(CommandBuffer& commandBuffer, size_t imageIndex)
 
 		m_Context.DispatchTable.cmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-		m_Context.DispatchTable.cmdDraw(commandBuffer, static_cast<uint32_t>(m_VertexBuffer->GetSize() / sizeof(Vertex)), 1, 0, 0);
+		m_Context.DispatchTable.cmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *m_Pipeline);
+		m_Context.DispatchTable.cmdBindDescriptorSets(commandBuffer
+													  , VK_PIPELINE_BIND_POINT_GRAPHICS
+													  , *m_PipelineLayout
+													  , 0
+													  , 1
+													  , m_FrameDescriptorSets[m_CurrentFrame]
+													  , 0
+													  , nullptr);
+
+		VkDeviceSize offsets[] = { {} };
+
+		//
+		for (auto const& meshes = m_Scene->GetMeshes();
+			 Mesh const& mesh: meshes)
+		{
+			m_Context.DispatchTable.cmdBindVertexBuffers(commandBuffer
+														 , 0
+														 , 1
+														 , mesh.GetVertexBuffer()
+														 , offsets);
+
+			m_Context.DispatchTable.cmdBindIndexBuffer(commandBuffer, mesh.GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+
+			m_Context.DispatchTable.cmdDrawIndexed(commandBuffer
+												   , static_cast<uint32_t>(mesh.GetIndexBuffer().GetSize() / sizeof(uint32_t))
+												   , 1
+												   , 0
+												   , 0
+												   , 0);
+		}
 	}
 	m_Context.DispatchTable.cmdEndRendering(commandBuffer);
 

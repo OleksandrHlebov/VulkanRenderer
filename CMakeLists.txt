@@ -31,6 +31,15 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(glm)
 list(APPEND EXTERNAL_LIBS glm)
 
+FetchContent_Declare(
+		assimp
+		URL https://github.com/assimp/assimp/archive/refs/tags/v6.0.2.tar.gz)
+FetchContent_MakeAvailable(assimp)
+list(APPEND EXTERNAL_LIBS glm)
+set(ASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT OFF)
+set(ASSIMP_BUILD_ALL_EXPORTERS_BY_DEFAULT OFF)
+set(ASSIMP_BUILD_TESTS OFF)
+set(ASSIMP_BUILD_ASSIMP_VIEW OFF)
 find_package(Vulkan REQUIRED)
 
 add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/W4>
