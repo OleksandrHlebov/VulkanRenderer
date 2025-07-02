@@ -7,7 +7,6 @@
 #include "shader_stage.h"
 
 #include <span>
-#include <ranges>
 
 #include "scene.h"
 
@@ -309,16 +308,20 @@ void App::CreateDescriptorSets()
 		samplerInfo[0].imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		samplerInfo[0].imageView   = VK_NULL_HANDLE;
 
-		auto const& textures      = m_Scene->GetTextureImages();
-		auto const& textureImages = m_Scene->GetTextureImageViews();
+		auto const& textures     = m_Scene->GetTextureImages();
+		auto const& textureViews = m_Scene->GetTextureImageViews();
 
 		std::vector<VkDescriptorImageInfo> imageInfos;
 		imageInfos.reserve(textures.size());
 
-		for (auto [image, view]: std::views::zip(textures, textureImages))
+		for (auto [image, view]{ std::make_pair(textures.begin(), textureViews.begin()) };
+			 image != textures.end() && view != textureViews.end();
+			 ++image, ++view)
 		{
-			imageInfos.emplace_back(VK_NULL_HANDLE, view, image.GetLayout());
+			imageInfos.emplace_back(VK_NULL_HANDLE, *view, image->GetLayout());
 		}
+
+		for (uint32_t index{}; index < textures.size(); ++index) {}
 
 		for (auto& descriptor: m_GlobalDescriptorSets)
 			descriptor
