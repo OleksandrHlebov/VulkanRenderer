@@ -31,7 +31,7 @@ jobs:
 
       - name: Install GCC 14
         run: |
-          choco install mingw --version=14.3.0
+          choco install mingw --version=latest
 
       - name: Verify glslang is available
         shell: cmd
