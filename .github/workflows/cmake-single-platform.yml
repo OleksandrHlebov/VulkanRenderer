@@ -2,9 +2,9 @@ name: CMake Windows Build with Vulkan SDK
 
 on:
   push:
-    branches: [ "base_triangle" ]
+    branches: [ "master" ]
   pull_request:
-    branches: [ "base_triangle" ]
+    branches: [ "master" ]
 
 jobs:
   build:
