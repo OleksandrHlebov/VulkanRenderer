@@ -45,6 +45,13 @@ void Buffer::CopyTo(Context const& context, CommandBuffer const& commandBuffer, 
 	context.DispatchTable.cmdCopyBufferToImage2(commandBuffer, &copyImageInfo);
 }
 
+void Buffer::Destroy(Context const& context) const
+{
+	if (m_Data)
+		vmaUnmapMemory(context.Allocator, m_Allocation);
+	vmaDestroyBuffer(context.Allocator, *this, m_Allocation);
+}
+
 BufferBuilder::BufferBuilder(Context& context)
 	: m_Context{ context }
 {

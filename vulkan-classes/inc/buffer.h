@@ -5,6 +5,9 @@
 #include "context.h"
 #include "image.h"
 
+template<typename T>
+concept IsContainer = requires(T t) { t.data(); t.size(); };
+
 class Buffer final
 {
 public:
@@ -24,12 +27,21 @@ public:
 	void UpdateData(DataType const& data)
 	{
 		assert(m_Data);
-		memcpy(m_Data, &data, sizeof(DataType));
+		if constexpr (!IsContainer<DataType>)
+		{
+			memcpy(m_Data, &data, sizeof(DataType));
+		}
+		else
+		{
+			memcpy(m_Data, data.data(), data.size() * sizeof(data[0]));
+		}
 	}
 
 	void CopyTo(Context const& context, CommandBuffer const& commandBuffer, Buffer const& dst) const;
 
 	void CopyTo(Context const& context, CommandBuffer const& commandBuffer, Image const& dst) const;
+
+	void Destroy(Context const& context) const;
 
 	operator VkBuffer() const
 	{
