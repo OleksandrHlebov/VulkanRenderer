@@ -27,12 +27,12 @@ public:
 
 	[[nodiscard]] Buffer const& GetVertexBuffer() const
 	{
-		return *m_VertexBuffer;
+		return m_VertexBuffer;
 	}
 
 	[[nodiscard]] Buffer const& GetIndexBuffer() const
 	{
-		return *m_IndexBuffer;
+		return m_IndexBuffer;
 	}
 
 	void SetRotation(glm::vec3 const& rotation);
@@ -50,9 +50,6 @@ public:
 	glm::mat4 GetModelMatrix();
 
 private:
-	template<typename T>
-	using uptr = std::unique_ptr<T>;
-
 	glm::vec3 m_Position{};
 	glm::vec3 m_Rotation{};
 	glm::vec3 m_Scale{};
@@ -61,9 +58,9 @@ private:
 	std::vector<Vertex>   m_Vertices;
 	std::vector<uint32_t> m_Indices;
 
-	uptr<Buffer> m_VertexBuffer;
-	uptr<Buffer> m_IndexBuffer;
-	bool         m_ModelChanged{ false };
+	Buffer m_VertexBuffer;
+	Buffer m_IndexBuffer;
+	bool   m_ModelChanged{ false };
 };
 
 #endif //MESH_H

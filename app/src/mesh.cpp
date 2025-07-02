@@ -11,18 +11,18 @@ Mesh::Mesh
 	, std::vector<uint32_t>&& indices, Buffer const&  stagingIndex
 )
 	: m_Vertices(std::move(vertices))
+	, m_VertexBuffer(BufferBuilder{ context }
+					 .SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+					 .Build(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+							, m_Vertices.size() * sizeof(m_Vertices[0])))
 	, m_Indices(std::move(indices))
+	, m_IndexBuffer(BufferBuilder{ context }
+					.SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+					.Build(VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+						   , m_Indices.size() * sizeof(m_Indices[0])))
 {
-	m_VertexBuffer = std::make_unique<Buffer>(BufferBuilder{ context }
-											  .SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
-											  .Build(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
-													 , m_Vertices.size() * sizeof(m_Vertices[0])));
-	stagingVert.CopyTo(context, commandBuffer, *m_VertexBuffer);
-	m_IndexBuffer = std::make_unique<Buffer>(BufferBuilder{ context }
-											 .SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
-											 .Build(VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
-													, m_Indices.size() * sizeof(m_Indices[0])));
-	stagingIndex.CopyTo(context, commandBuffer, *m_IndexBuffer);
+	stagingVert.CopyTo(context, commandBuffer, m_VertexBuffer);
+	stagingIndex.CopyTo(context, commandBuffer, m_IndexBuffer);
 }
 
 void Mesh::SetRotation(glm::vec3 const& rotation)
