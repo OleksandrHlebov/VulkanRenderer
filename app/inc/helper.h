@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "vulkan/vulkan_core.h"
+
 namespace help
 {
 	inline std::vector<char> ReadFile(const std::string& filename)
@@ -46,6 +48,19 @@ namespace help
 	{
 		return format == VK_FORMAT_D24_UNORM_S8_UINT || format == VK_FORMAT_D32_SFLOAT_S8_UINT;
 	}
+
+	struct ImageData
+	{
+		~ImageData();
+
+		int            Width;
+		int            Height;
+		int            Channels;
+		unsigned char* Pixels;
+		VkDeviceSize   Size;
+	};
+
+	ImageData LoadImage(std::string_view path);
 }
 
 #endif //HELPER_H

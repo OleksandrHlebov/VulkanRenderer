@@ -138,9 +138,8 @@ public:
 	ImageBuilder& SetMemoryUsage(VmaMemoryUsage memoryUsage);
 	ImageBuilder& SetFlags(VkImageCreateFlags flags);
 	ImageBuilder& SetSharingMode(VkSharingMode sharingMode);
-	ImageBuilder& SetFileName(std::string const& fileName, CommandPool& commandPool);
 
-	[[nodiscard]] Image Build(VkImageUsageFlags usage, bool addToQueue = true);
+	[[nodiscard]] Image Build(VkImageUsageFlags usage, bool addToQueue = true) const;
 
 private:
 	Context&           m_Context;
