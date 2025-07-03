@@ -8,6 +8,7 @@
 #include <stdexcept>
 
 #include "command_pool.h"
+#include "helper.h"
 
 Scene::Scene(Context& context, CommandPool& commandPool)
 	: m_Context{ context }
@@ -34,6 +35,12 @@ void Scene::LoadScene(std::string_view filename)
 	if (auto const result = m_Context.DispatchTable.waitForFences(1, &commandBuffer.GetFence(), VK_TRUE, UINT64_MAX);
 		result != VK_SUCCESS)
 		throw std::runtime_error("failed to wait for the fences");
+
+	while (!m_StagingBuffers.empty())
+	{
+		m_StagingBuffers.top().Destroy(m_Context);
+		m_StagingBuffers.pop();
+	}
 }
 
 void Scene::LoadFirstMeshFromFile(std::string_view filename)
@@ -78,21 +85,23 @@ void Scene::ProcessNode(aiNode const* node, aiScene const* scene, CommandBuffer&
 		}
 		// TODO: materials
 		TextureIndices textureIndices{};
-		textureIndices.Diffuse = LoadTexture(aiTextureType_DIFFUSE, scene->mMaterials[mesh->mMaterialIndex]);
-		Buffer& stagingVert    = m_StagingBuffers.emplace_back(BufferBuilder{ m_Context }
-															.MapMemory()
-															.SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
-																					VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
-															.Build(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT
-																   , tempVertices.size() * sizeof(tempVertices[0])));
+		textureIndices.Diffuse = LoadTexture(aiTextureType_DIFFUSE, scene->mMaterials[mesh->mMaterialIndex], commandBuffer);
+		Buffer& stagingVert    = m_StagingBuffers.emplace(BufferBuilder{ m_Context }
+													   .MapMemory()
+													   .SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
+																			   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+													   .Build(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+															  , tempVertices.size() * sizeof(tempVertices[0])
+															  , false));
 		stagingVert.UpdateData(tempVertices);
 
-		Buffer& stagingIndex = m_StagingBuffers.emplace_back(BufferBuilder{ m_Context }
-															 .MapMemory()
-															 .SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
-																					 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
-															 .Build(VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT
-																	, tempIndices.size() * sizeof(tempIndices[0])));
+		Buffer& stagingIndex = m_StagingBuffers.emplace(BufferBuilder{ m_Context }
+														.MapMemory()
+														.SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
+																				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+														.Build(VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+															   , tempIndices.size() * sizeof(tempIndices[0])
+															   , false));
 		stagingIndex.UpdateData(tempIndices);
 
 		m_Meshes.emplace_back(m_Context
@@ -101,13 +110,13 @@ void Scene::ProcessNode(aiNode const* node, aiScene const* scene, CommandBuffer&
 							  , stagingVert
 							  , std::move(tempIndices)
 							  , stagingIndex
-							  , std::move(textureIndices));
+							  , textureIndices);
 	}
 	for (uint32_t index{}; index < node->mNumChildren; index++)
 		ProcessNode(node->mChildren[index], scene, commandBuffer);
 }
 
-uint32_t Scene::LoadTexture(aiTextureType type, aiMaterial const* material)
+uint32_t Scene::LoadTexture(aiTextureType type, aiMaterial const* material, CommandBuffer const& commandBuffer)
 {
 	aiString str;
 	if (material->GetTextureCount(type))
@@ -117,14 +126,52 @@ uint32_t Scene::LoadTexture(aiTextureType type, aiMaterial const* material)
 
 	if (!m_LoadedTextures.contains(str.C_Str()))
 	{
-		ImageBuilder builder{ m_Context };
+		std::string const fullPath{ "data/textures/" + std::string{ str.C_Str() } };
+		m_LoadedTextures[str.C_Str()] = static_cast<uint32_t>(m_TextureImages.size());
 
-		Image const& image = m_TextureImages.emplace_back(builder
-														  .SetType(VK_IMAGE_TYPE_2D)
-														  .SetFileName("data/textures/" + std::string{ str.C_Str() }, m_CommandPool)
-														  .Build(VK_IMAGE_USAGE_SAMPLED_BIT));
+		help::ImageData const imageData{ help::LoadImage(fullPath) };
+
+		std::span const span{ imageData.Pixels, imageData.Pixels + imageData.Size };
+
+		Buffer& stagingBuffer = m_StagingBuffers.emplace(BufferBuilder{ m_Context }
+														 .MapMemory()
+														 .SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+																				 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+														 .Build(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, imageData.Size, false));
+		stagingBuffer.UpdateData(span);
+
+		Image& image = m_TextureImages.emplace_back(ImageBuilder{ m_Context }
+													.SetType(VK_IMAGE_TYPE_2D)
+													.SetFormat(VK_FORMAT_R8G8B8A8_SRGB)
+													.SetAspectFlags(VK_IMAGE_ASPECT_COLOR_BIT)
+													.SetExtent({
+																   static_cast<uint32_t>(imageData.Width)
+																   , static_cast<uint32_t>(imageData.Height)
+															   })
+													.Build(VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT));
+
 		m_TextureImageViews.emplace_back(image.CreateView(m_Context, VK_IMAGE_VIEW_TYPE_2D));
-		m_LoadedTextures[str.C_Str()] = static_cast<uint32_t>(m_TextureImages.size() - 1);
+		//
+		{
+			Image::Transition transition{};
+			transition.NewLayout     = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+			transition.SrcAccessMask = VK_ACCESS_NONE;
+			transition.DstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			transition.SrcStageMask  = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+			transition.DstStageMask  = VK_PIPELINE_STAGE_TRANSFER_BIT;
+			image.MakeTransition(m_Context, commandBuffer, transition);
+		}
+		stagingBuffer.CopyTo(m_Context, commandBuffer, image);
+		//
+		{
+			Image::Transition transition{};
+			transition.NewLayout     = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+			transition.SrcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			transition.DstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+			transition.SrcStageMask  = VK_PIPELINE_STAGE_TRANSFER_BIT;
+			transition.DstStageMask  = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+			image.MakeTransition(m_Context, commandBuffer, transition);
+		}
 	}
 	return m_LoadedTextures[str.C_Str()];
 }

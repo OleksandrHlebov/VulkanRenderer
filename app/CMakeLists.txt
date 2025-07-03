@@ -36,6 +36,7 @@ set(HEADER
 
 set(SOURCE
     src/app.cpp
+    src/helper.cpp
     src/world_time.cpp
     src/scene.cpp
     src/mesh.cpp)
@@ -45,7 +46,8 @@ add_library(App STATIC
             ${HEADER})
 target_include_directories(${PROJECT_NAME} PRIVATE
                            ${CMAKE_CURRENT_SOURCE_DIR}/inc
-                           ${CMAKE_CURRENT_SOURCE_DIR}/src)
+                           ${CMAKE_CURRENT_SOURCE_DIR}/src
+                           ${stb_SOURCE_DIR})
 target_include_directories(${PROJECT_NAME} PUBLIC
                            ${CMAKE_CURRENT_SOURCE_DIR})
 

@@ -17,7 +17,7 @@ public:
 		, CommandBuffer const&    commandBuffer
 		, std::vector<Vertex>&&   vertices, Buffer const& stagingVert
 		, std::vector<uint32_t>&& indices, Buffer const&  stagingIndex
-		, TextureIndices&&        textureIndices
+		, TextureIndices          textureIndices
 	);
 	~Mesh() = default;
 

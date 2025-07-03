@@ -46,12 +46,12 @@ public:
 
 private:
 	void     ProcessNode(aiNode const* node, aiScene const* scene, CommandBuffer& commandBuffer);
-	uint32_t LoadTexture(aiTextureType, aiMaterial const* material);
+	uint32_t LoadTexture(aiTextureType, aiMaterial const* material, CommandBuffer const& commandBuffer);
 
 	Context&     m_Context;
 	CommandPool& m_CommandPool;
 
-	std::list<Buffer> m_StagingBuffers;
+	std::stack<Buffer> m_StagingBuffers;
 
 	std::list<Mesh> m_Meshes;
 

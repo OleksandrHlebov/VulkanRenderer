@@ -45,8 +45,7 @@ endif ()
 
 target_include_directories(${PROJECT_NAME} PUBLIC
                            ${CMAKE_CURRENT_SOURCE_DIR}/inc
-                           ${CMAKE_CURRENT_SOURCE_DIR}/src
-                           ${stb_SOURCE_DIR})
+                           ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 target_link_libraries(${PROJECT_NAME} PUBLIC
                       Vulkan::Vulkan
