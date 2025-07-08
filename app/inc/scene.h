@@ -34,12 +34,12 @@ public:
 		return m_Meshes;
 	}
 
-	[[nodiscard]] std::list<Image> const& GetTextureImages() const
+	[[nodiscard]] std::span<Image> GetTextureImages()
 	{
 		return m_TextureImages;
 	}
 
-	[[nodiscard]] std::list<ImageView> const& GetTextureImageViews() const
+	[[nodiscard]] std::span<ImageView> GetTextureImageViews()
 	{
 		return m_TextureImageViews;
 	}
@@ -55,8 +55,8 @@ private:
 
 	std::list<Mesh> m_Meshes;
 
-	std::list<Image>                          m_TextureImages;
-	std::list<ImageView>                      m_TextureImageViews;
+	std::vector<Image>                        m_TextureImages;
+	std::vector<ImageView>                    m_TextureImageViews;
 	std::unordered_map<std::string, uint32_t> m_LoadedTextures;
 
 	glm::vec3 m_AABBMin{ FLT_MAX };

@@ -58,7 +58,7 @@ public:
 	template<typename DataType>
 	void AddSpecializationConstant(DataType data)
 	{
-		uint32_t const offset = static_cast<uint32_t>(m_SpecializationData.size());
+		auto const offset = static_cast<uint32_t>(m_SpecializationData.size());
 		m_MapEntries.emplace_back(static_cast<uint32_t>(m_MapEntries.size())
 								  , offset
 								  , sizeof(data));

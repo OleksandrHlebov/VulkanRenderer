@@ -261,6 +261,43 @@ void App::CreateSyncObjects()
 	}
 }
 
+void App::CreateDescriptorSetLayouts()
+{
+	//
+	{
+		DescriptorSetLayoutBuilder builder{ m_Context };
+		DescriptorSetLayout        layout = builder
+									 .AddBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
+									 .Build();
+
+		m_FrameDescSetLayout = std::make_unique<DescriptorSetLayout>(std::move(layout));
+	}
+	//
+	{
+		VkSamplerCreateInfo samplerCreateInfo{};
+		samplerCreateInfo.sType        = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		samplerCreateInfo.minFilter    = VK_FILTER_LINEAR;
+		samplerCreateInfo.magFilter    = VK_FILTER_LINEAR;
+		samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+		m_Context.DispatchTable.createSampler(&samplerCreateInfo, nullptr, &m_TextureSampler);
+
+		m_Context.DeletionQueue.Push([this]
+		{
+			m_Context.DispatchTable.destroySampler(m_TextureSampler, nullptr);
+		});
+
+		DescriptorSetLayoutBuilder builder{ m_Context };
+		DescriptorSetLayout        layout = builder
+									 .AddBinding(0, VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+									 .AddBinding(1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
+									 .Build();
+		m_GlobalDescSetLayout = std::make_unique<DescriptorSetLayout>(std::move(layout));
+	}
+}
+
 void App::CreateDescriptorPool()
 {
 	DescriptorPoolBuilder builder{ m_Context };
@@ -300,13 +337,14 @@ void App::CreateDescriptorSets()
 	{
 		std::vector<VkDescriptorSetLayout> layouts(m_FramesInFlight, *m_GlobalDescSetLayout);
 
-		DescriptorSetBuilder const builder{ m_Context };
-		m_GlobalDescriptorSets = builder.Build(*m_DescPool, layouts);
-
-		VkDescriptorImageInfo samplerInfo[]{ {} };
-		samplerInfo[0].sampler     = m_TextureSampler;
-		samplerInfo[0].imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		samplerInfo[0].imageView   = VK_NULL_HANDLE;
+		VkDescriptorImageInfo samplerInfo[]
+		{
+			{
+				.sampler = m_TextureSampler
+				, .imageView = VK_NULL_HANDLE
+				, .imageLayout = VK_IMAGE_LAYOUT_UNDEFINED
+			}
+		};
 
 		auto const& textures     = m_Scene->GetTextureImages();
 		auto const& textureViews = m_Scene->GetTextureImageViews();
@@ -321,7 +359,8 @@ void App::CreateDescriptorSets()
 			imageInfos.emplace_back(VK_NULL_HANDLE, *view, image->GetLayout());
 		}
 
-		for (uint32_t index{}; index < textures.size(); ++index) {}
+		DescriptorSetBuilder const builder{ m_Context };
+		m_GlobalDescriptorSets = builder.Build(*m_DescPool, layouts);
 
 		for (auto& descriptor: m_GlobalDescriptorSets)
 			descriptor
@@ -378,43 +417,6 @@ void App::CreateCmdPool()
 												  , m_Context.Device.get_queue_index(vkb::QueueType::graphics).value()
 												  , m_FramesInFlight
 												  , VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-}
-
-void App::CreateDescriptorSetLayouts()
-{
-	//
-	{
-		DescriptorSetLayoutBuilder builder{ m_Context };
-		DescriptorSetLayout        layout = builder
-									 .AddBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
-									 .Build();
-
-		m_FrameDescSetLayout = std::make_unique<DescriptorSetLayout>(std::move(layout));
-	}
-	//
-	{
-		VkSamplerCreateInfo samplerCreateInfo{};
-		samplerCreateInfo.sType        = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-		samplerCreateInfo.minFilter    = VK_FILTER_LINEAR;
-		samplerCreateInfo.magFilter    = VK_FILTER_LINEAR;
-		samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-
-		m_Context.DispatchTable.createSampler(&samplerCreateInfo, nullptr, &m_TextureSampler);
-
-		m_Context.DeletionQueue.Push([this]
-		{
-			m_Context.DispatchTable.destroySampler(m_TextureSampler, nullptr);
-		});
-
-		DescriptorSetLayoutBuilder builder{ m_Context };
-		DescriptorSetLayout        layout = builder
-									 .AddBinding(0, VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
-									 .AddBinding(1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
-									 .Build();
-		m_GlobalDescSetLayout = std::make_unique<DescriptorSetLayout>(std::move(layout));
-	}
 }
 
 void App::CreateResources()
