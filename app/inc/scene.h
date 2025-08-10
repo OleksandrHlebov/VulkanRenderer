@@ -29,6 +29,11 @@ public:
 
 	void LoadFirstMeshFromFile(std::string_view filename);
 
+	bool ContainsPBRInfo() const
+	{
+		return m_ContainsPBRInfo;
+	};
+
 	[[nodiscard]] std::list<Mesh> const& GetMeshes() const
 	{
 		return m_Meshes;
@@ -61,6 +66,8 @@ private:
 
 	glm::vec3 m_AABBMin{ FLT_MAX };
 	glm::vec3 m_AABBMax{ FLT_MIN };
+
+	bool m_ContainsPBRInfo{};
 };
 
 #endif //SCENE_H

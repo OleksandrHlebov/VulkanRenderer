@@ -27,6 +27,17 @@ void Scene::LoadScene(std::string_view filename)
 	{
 		throw std::runtime_error("failed to load model " + std::string(importer.GetErrorString()));
 	}
+	for (unsigned int i = 0; i < scene->mNumMaterials; ++i)
+	{
+		if (aiMaterial const* material = scene->mMaterials[i];
+			material->GetTextureCount(aiTextureType_NORMALS) > 0 &&
+			material->GetTextureCount(aiTextureType_DIFFUSE_ROUGHNESS) > 0 &&
+			material->GetTextureCount(aiTextureType_METALNESS) > 0)
+		{
+			m_ContainsPBRInfo = true;
+			break;
+		}
+	}
 	vkc::CommandBuffer& commandBuffer = m_CommandPool.AllocateCommandBuffer(m_Context);
 	commandBuffer.Begin(m_Context, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	ProcessNode(scene->mRootNode, scene, commandBuffer);

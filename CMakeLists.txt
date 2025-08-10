@@ -47,6 +47,13 @@ add_executable(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME} PRIVATE App)
 
+set(ASSIMP_DLL "${assimp_BINARY_DIR}/bin/assimp-vc143-mtd.dll")
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                   "${ASSIMP_DLL}"
+                   "${CMAKE_BINARY_DIR}/"
+                   )
+
 foreach (target IN LISTS EXTERNAL_LIBS)
 	target_compile_options(${target} PRIVATE
 	                       $<$<CXX_COMPILER_ID:MSVC>:/W0>

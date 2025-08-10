@@ -23,6 +23,12 @@ macro(Shader_Compile name)
 	list(APPEND COMPILED_SHADERS ${SHADER_SPIRV_PATH})
 endmacro()
 
+FetchContent_Declare(
+		VulkanClasses
+		GIT_REPOSITORY https://github.com/OleksandrHlebov/vulkan-classes.git
+		GIT_TAG master)
+FetchContent_MakeAvailable(VulkanClasses)
+
 set(SHADER_SOURCES
     "basic_color.frag"
     "basic_transform.vert")
@@ -41,8 +47,6 @@ set(SOURCE
     src/world_time.cpp
     src/scene.cpp
     src/mesh.cpp)
-
-add_subdirectory(vulkan-classes)
 
 add_library(App STATIC
             ${SOURCE}

@@ -1,5 +1,7 @@
 #include "app.h"
 
+#include <iostream>
+
 #include "command_pool.h"
 #include "datatypes.h"
 #include "helper.h"
@@ -37,7 +39,8 @@ App::App(int width, int height)
 	CreateCmdPool();
 	// TODO: Load scene
 	m_Scene = std::make_unique<Scene>(m_Context, *m_CommandPool);
-	m_Scene->LoadScene("data/glTF/Fox.gltf");
+	m_Scene->LoadScene("data/glTF/Sponza.gltf");
+	std::cout << (m_Scene->ContainsPBRInfo() ? "scene contains pbr info" : "scene does not contain pbr info") << std::endl;
 	// CreateVertexBuffer();
 	CreateDescriptorSetLayouts();
 	// TODO: Create resources (depth/textures)
@@ -292,7 +295,10 @@ void App::CreateDescriptorSetLayouts()
 		vkc::DescriptorSetLayoutBuilder builder{ m_Context };
 		vkc::DescriptorSetLayout        layout = builder
 										  .AddBinding(0, VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
-										  .AddBinding(1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
+										  .AddBinding(1
+													  , VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
+													  , VK_SHADER_STAGE_FRAGMENT_BIT
+													  , static_cast<uint32_t>(m_Scene->GetTextureImages().size()))
 										  .Build();
 		m_GlobalDescSetLayout = std::make_unique<vkc::DescriptorSetLayout>(std::move(layout));
 	}
