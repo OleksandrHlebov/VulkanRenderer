@@ -30,11 +30,11 @@ public:
 
 	struct Transition
 	{
-		VkAccessFlags2       SrcAccessMask{};
-		VkAccessFlags2       DstAccessMask{};
-		VkPipelineStageFlags SrcStageMask{};
-		VkPipelineStageFlags DstStageMask{};
-		VkImageLayout        NewLayout{};
+		VkAccessFlags2        SrcAccessMask{};
+		VkAccessFlags2        DstAccessMask{};
+		VkPipelineStageFlags2 SrcStageMask{};
+		VkPipelineStageFlags2 DstStageMask{};
+		VkImageLayout         NewLayout{};
 
 		// in case of multi-layered images
 		uint32_t BaseLayer{ 0 };
@@ -50,6 +50,17 @@ public:
 	void Destroy(Context const& context) const;
 
 	void MakeTransition(Context const& context, VkCommandBuffer commandBuffer, Transition const& transition);
+
+	void MakeTransition
+	(
+		Context const&        context,
+		VkCommandBuffer       commandBuffer,
+		ImageView const&      view,
+		VkAccessFlags2        srcAccess, VkAccessFlags       dstAccess,
+		VkPipelineStageFlags2 srcStage, VkPipelineStageFlags dstStage,
+		VkImageLayout         newLayout,
+		uint32_t              srcQueue = VK_QUEUE_FAMILY_IGNORED, uint32_t dstQueue = VK_QUEUE_FAMILY_IGNORED
+	);
 
 	[[nodiscard]] VkImageLayout GetLayout(uint32_t mipLevel = 0, uint32_t layer = 0) const
 	{

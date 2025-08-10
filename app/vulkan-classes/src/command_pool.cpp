@@ -64,3 +64,8 @@ CommandBuffer& CommandPool::AllocateCommandBuffer(Context& context)
 
 	return m_CommandBuffers.back();
 }
+
+void CommandPool::Destroy(Context const& context) const
+{
+	context.DispatchTable.destroyCommandPool(m_Pool, nullptr);
+}

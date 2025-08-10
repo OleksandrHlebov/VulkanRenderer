@@ -14,6 +14,31 @@ public:
 
 	static void ConvertFromSwapchainVkImageViews(Context& context, std::vector<ImageView>& convertedViews);
 
+	uint32_t GetBaseLayer() const
+	{
+		return m_BaseLayer;
+	}
+
+	uint32_t GetLayerCount() const
+	{
+		return m_LayerCount;
+	}
+
+	uint32_t GetBaseMipLevel() const
+	{
+		return m_BaseMipLevel;
+	}
+
+	uint32_t GetMipLevelCount() const
+	{
+		return m_MipLevelCount;
+	}
+
+	uint32_t GetType() const
+	{
+		return m_Type;
+	}
+
 	void Destroy(Context const& context) const;
 
 	operator VkImageView() const
@@ -30,7 +55,12 @@ private:
 	friend class Image;
 	ImageView() = default;
 
-	VkImageView m_ImageView{};
+	VkImageView     m_ImageView{};
+	VkImageViewType m_Type{};
+	uint32_t        m_BaseLayer{};
+	uint32_t        m_BaseMipLevel{};
+	uint32_t        m_LayerCount{};
+	uint32_t        m_MipLevelCount{};
 };
 
 #endif //IMAGE_VIEW_H

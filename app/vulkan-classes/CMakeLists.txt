@@ -7,7 +7,8 @@ find_package(Vulkan REQUIRED)
 include(FetchContent)
 
 set(EXTERNAL_LIBS)
-
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
 		glfw
 		URL https://github.com/glfw/glfw/archive/refs/tags/3.4.tar.gz)
@@ -67,8 +68,7 @@ else ()
 endif ()
 
 target_include_directories(${PROJECT_NAME} PUBLIC
-                           inc
-                           src)
+                           ${CMAKE_CURRENT_SOURCE_DIR}/inc)
 
 target_link_libraries(${PROJECT_NAME} PUBLIC
                       Vulkan::Vulkan

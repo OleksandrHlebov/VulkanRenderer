@@ -20,6 +20,8 @@ public:
 
 	CommandBuffer& AllocateCommandBuffer(Context& context);
 
+	void Destroy(Context const& context) const;
+
 	operator VkCommandPool*()
 	{
 		return &m_Pool;

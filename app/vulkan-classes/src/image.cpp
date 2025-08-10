@@ -12,13 +12,13 @@ ImageView Image::CreateView
 	imageViewCreateInfo.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	imageViewCreateInfo.flags                           = 0;
 	imageViewCreateInfo.image                           = *this;
-	imageViewCreateInfo.viewType                        = type;
+	imageViewCreateInfo.viewType                        = imageView.m_Type = type;
 	imageViewCreateInfo.format                          = m_Format;
 	imageViewCreateInfo.subresourceRange.aspectMask     = m_AspectFlags;
-	imageViewCreateInfo.subresourceRange.layerCount     = layerCount;
-	imageViewCreateInfo.subresourceRange.levelCount     = levelCount;
-	imageViewCreateInfo.subresourceRange.baseMipLevel   = baseMipLevel;
-	imageViewCreateInfo.subresourceRange.baseArrayLayer = baseLayer;
+	imageViewCreateInfo.subresourceRange.layerCount     = imageView.m_LayerCount    = layerCount;
+	imageViewCreateInfo.subresourceRange.levelCount     = imageView.m_MipLevelCount = levelCount;
+	imageViewCreateInfo.subresourceRange.baseMipLevel   = imageView.m_BaseMipLevel  = baseMipLevel;
+	imageViewCreateInfo.subresourceRange.baseArrayLayer = imageView.m_BaseLayer     = baseLayer;
 
 	if (auto const result = context.DispatchTable.createImageView(&imageViewCreateInfo, nullptr, imageView);
 		result != VK_SUCCESS)
@@ -68,6 +68,35 @@ void Image::MakeTransition(Context const& context, VkCommandBuffer commandBuffer
 	for (uint32_t mipLevel{}; mipLevel < transition.LevelCount; ++mipLevel)
 		for (uint32_t layer{}; layer < transition.LayerCount; ++layer)
 			m_Layouts[transition.BaseMipLevel + mipLevel][transition.BaseLayer + layer] = transition.NewLayout;
+}
+
+void Image::MakeTransition
+(
+	Context const&        context,
+	VkCommandBuffer       commandBuffer,
+	ImageView const&      view,
+	VkAccessFlags2        srcAccess, VkAccessFlags       dstAccess,
+	VkPipelineStageFlags2 srcStage, VkPipelineStageFlags dstStage,
+	VkImageLayout         newLayout,
+	uint32_t              srcQueue, uint32_t dstQueue
+)
+{
+	Transition transition{};
+	transition.SrcAccessMask = srcAccess;
+	transition.DstAccessMask = dstAccess;
+	transition.SrcStageMask  = srcStage;
+	transition.DstStageMask  = dstStage;
+	transition.NewLayout     = newLayout;
+
+	transition.BaseLayer    = view.GetBaseLayer();
+	transition.BaseMipLevel = view.GetBaseMipLevel();
+	transition.LayerCount   = view.GetLayerCount();
+	transition.LevelCount   = view.GetMipLevelCount();
+
+	transition.SrcQueue = srcQueue;
+	transition.DstQueue = dstQueue;
+
+	MakeTransition(context, commandBuffer, transition);
 }
 
 void Image::ConvertFromSwapchainVkImages(Context& context, std::vector<Image>& convertedImages)

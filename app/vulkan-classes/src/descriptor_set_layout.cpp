@@ -1,5 +1,10 @@
 #include "descriptor_set_layout.h"
 
+void DescriptorSetLayout::Destroy(Context const& context) const
+{
+	context.DispatchTable.destroyDescriptorSetLayout(m_Layout, nullptr);
+}
+
 DescriptorSetLayoutBuilder::DescriptorSetLayoutBuilder(Context& context)
 	: m_Context{ context } {}
 

@@ -13,6 +13,8 @@ public:
 	DescriptorSetLayout& operator=(DescriptorSetLayout&&)      = default;
 	DescriptorSetLayout& operator=(DescriptorSetLayout const&) = delete;
 
+	void Destroy(Context const& context) const;
+
 	operator VkDescriptorSetLayout() const
 	{
 		return m_Layout;
