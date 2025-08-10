@@ -6,7 +6,6 @@ set(CMAKE_CXX_STANDARD 20)
 set(INCLUDE
     inc/vma_usage.h
     inc/deletion_queue.h
-    inc/datatypes.h
     inc/Buffer.h
     inc/image.h
     inc/image_view.h

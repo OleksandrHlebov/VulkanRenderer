@@ -3,7 +3,7 @@
 #include "assimp/postprocess.h"
 #include "assimp/scene.h"
 
-#include "datatypes.h"
+#include "../inc/datatypes.h"
 
 #include <stdexcept>
 

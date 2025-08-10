@@ -29,6 +29,7 @@ set(SHADER_SOURCES
 
 set(HEADER
     inc/helper.h
+    inc/datatypes.h
     inc/camera.h
     inc/world_time.h
     inc/scene.h
