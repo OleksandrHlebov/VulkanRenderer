@@ -478,6 +478,51 @@ void App::RecreateSwapchain()
 void App::RecordCommandBuffer(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
 {
 	commandBuffer.Begin(m_Context);
+	DoMainPass(commandBuffer, imageIndex);
+	commandBuffer.End(m_Context);
+}
+
+void App::Submit(vkc::CommandBuffer& commandBuffer) const
+{
+	VkSemaphoreSubmitInfo waitSemaphoreSubmitInfo{};
+	waitSemaphoreSubmitInfo.sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+	waitSemaphoreSubmitInfo.semaphore = m_ImageAvailableSemaphores[m_CurrentFrame];
+	waitSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+	VkSemaphoreSubmitInfo signalSemaphoreSubmitInfo{};
+	signalSemaphoreSubmitInfo.sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+	signalSemaphoreSubmitInfo.semaphore = m_RenderFinishedSemaphores[m_CurrentFrame];
+
+	VkSemaphoreSubmitInfo waitSemaphoreInfos[]{ waitSemaphoreSubmitInfo };
+	VkSemaphoreSubmitInfo signalSemaphoreInfos[]{ signalSemaphoreSubmitInfo };
+
+	commandBuffer.Submit(m_Context, m_Context.GraphicsQueue, waitSemaphoreInfos, signalSemaphoreInfos, m_InFlightFences[m_CurrentFrame]);
+}
+
+void App::Present(uint32_t imageIndex)
+{
+	VkSwapchainKHR const swapchains[]{ m_Context.Swapchain };
+
+	VkPresentInfoKHR presentInfo{};
+	presentInfo.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+	presentInfo.waitSemaphoreCount = 1;
+	presentInfo.pWaitSemaphores    = &m_RenderFinishedSemaphores[m_CurrentFrame];
+	presentInfo.swapchainCount     = static_cast<uint32_t>(std::size(swapchains));
+	presentInfo.pSwapchains        = swapchains;
+	presentInfo.pImageIndices      = &imageIndex;
+
+	if (auto const result = m_Context.DispatchTable.queuePresentKHR(m_Context.PresentQueue, &presentInfo);
+		result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
+		RecreateSwapchain();
+}
+
+void App::End()
+{
+	m_Context.DeletionQueue.Flush();
+}
+
+void App::DoMainPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
+{
 	vkc::Image& swapchainImage = m_SwapchainImages[imageIndex];
 	// swapchain image to attachment optimal
 	{
@@ -514,13 +559,9 @@ void App::RecordCommandBuffer(vkc::CommandBuffer& commandBuffer, size_t imageInd
 	renderingAttachmentInfo.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	renderingAttachmentInfo.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
 
-	VkClearValue clearValue{};
-	clearValue.color        = { { 0.0f, 0.0f, 0.0f, 1.0f } };
-	clearValue.depthStencil = { 1.0f, 0 };
-
 	VkRenderingAttachmentInfo depthAttachmentInfo{};
 	depthAttachmentInfo.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-	depthAttachmentInfo.clearValue  = clearValue;
+	depthAttachmentInfo.clearValue  = { .depthStencil{ 1.f, 0 } };
 	depthAttachmentInfo.imageLayout = m_DepthImage->GetLayout();
 	depthAttachmentInfo.imageView   = *m_DepthImageView;
 	depthAttachmentInfo.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -535,7 +576,7 @@ void App::RecordCommandBuffer(vkc::CommandBuffer& commandBuffer, size_t imageInd
 	renderingInfo.renderArea           = VkRect2D{ {}, m_Context.Swapchain.extent };
 
 	m_Context.DispatchTable.cmdBeginRendering(commandBuffer, &renderingInfo);
-	// main pass
+	// render
 	{
 		VkViewport viewport{};
 		viewport.width    = static_cast<float>(m_Context.Swapchain.extent.width);
@@ -565,7 +606,6 @@ void App::RecordCommandBuffer(vkc::CommandBuffer& commandBuffer, size_t imageInd
 
 		VkDeviceSize offsets[] = { {} };
 
-		//
 		for (auto const& meshes = m_Scene->GetMeshes();
 			 Mesh const& mesh: meshes)
 		{
@@ -607,44 +647,4 @@ void App::RecordCommandBuffer(vkc::CommandBuffer& commandBuffer, size_t imageInd
 		}
 		swapchainImage.MakeTransition(m_Context, commandBuffer, transition);
 	}
-	commandBuffer.End(m_Context);
-}
-
-void App::Submit(vkc::CommandBuffer& commandBuffer) const
-{
-	VkSemaphoreSubmitInfo waitSemaphoreSubmitInfo{};
-	waitSemaphoreSubmitInfo.sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-	waitSemaphoreSubmitInfo.semaphore = m_ImageAvailableSemaphores[m_CurrentFrame];
-	waitSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-
-	VkSemaphoreSubmitInfo signalSemaphoreSubmitInfo{};
-	signalSemaphoreSubmitInfo.sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-	signalSemaphoreSubmitInfo.semaphore = m_RenderFinishedSemaphores[m_CurrentFrame];
-
-	VkSemaphoreSubmitInfo waitSemaphoreInfos[]{ waitSemaphoreSubmitInfo };
-	VkSemaphoreSubmitInfo signalSemaphoreInfos[]{ signalSemaphoreSubmitInfo };
-
-	commandBuffer.Submit(m_Context, m_Context.GraphicsQueue, waitSemaphoreInfos, signalSemaphoreInfos, m_InFlightFences[m_CurrentFrame]);
-}
-
-void App::Present(uint32_t imageIndex)
-{
-	VkSwapchainKHR const swapchains[]{ m_Context.Swapchain };
-
-	VkPresentInfoKHR presentInfo{};
-	presentInfo.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-	presentInfo.waitSemaphoreCount = 1;
-	presentInfo.pWaitSemaphores    = &m_RenderFinishedSemaphores[m_CurrentFrame];
-	presentInfo.swapchainCount     = static_cast<uint32_t>(std::size(swapchains));
-	presentInfo.pSwapchains        = swapchains;
-	presentInfo.pImageIndices      = &imageIndex;
-
-	if (auto const result = m_Context.DispatchTable.queuePresentKHR(m_Context.PresentQueue, &presentInfo);
-		result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
-		RecreateSwapchain();
-}
-
-void App::End()
-{
-	m_Context.DeletionQueue.Flush();
 }

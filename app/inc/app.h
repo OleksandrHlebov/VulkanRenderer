@@ -58,6 +58,8 @@ private:
 	void Present(uint32_t imageIndex);
 	void End();
 
+	void DoMainPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex);
+
 	uptr<Camera> m_Camera;
 	vkc::Context m_Context{};
 
