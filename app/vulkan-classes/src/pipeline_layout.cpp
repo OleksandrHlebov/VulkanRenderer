@@ -1,5 +1,10 @@
 #include "pipeline_layout.h"
 
+void PipelineLayout::Destroy(Context const& context) const
+{
+	context.DispatchTable.destroyPipelineLayout(m_Layout, nullptr);
+}
+
 PipelineLayoutBuilder& PipelineLayoutBuilder::AddDescriptorSetLayout(VkDescriptorSetLayout layout)
 {
 	m_DescSetLayouts.emplace_back(layout);

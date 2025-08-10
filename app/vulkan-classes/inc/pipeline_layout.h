@@ -14,6 +14,8 @@ public:
 	PipelineLayout& operator=(PipelineLayout&&)      = default;
 	PipelineLayout& operator=(PipelineLayout const&) = delete;
 
+	void Destroy(Context const& context) const;
+
 	operator VkPipelineLayout() const
 	{
 		return m_Layout;

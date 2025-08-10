@@ -16,6 +16,8 @@ public:
 	Pipeline& operator=(Pipeline&&)      = default;
 	Pipeline& operator=(Pipeline const&) = delete;
 
+	void Destroy(Context const& context) const;
+
 	operator VkPipeline() const
 	{
 		return m_Pipeline;

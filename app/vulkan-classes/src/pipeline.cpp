@@ -2,6 +2,11 @@
 
 #include "shader_stage.h"
 
+void Pipeline::Destroy(Context const& context) const
+{
+	context.DispatchTable.destroyPipeline(m_Pipeline, nullptr);
+}
+
 PipelineBuilder::PipelineBuilder(Context& context)
 	: m_Context{ context }
 {

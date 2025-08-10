@@ -10,22 +10,7 @@ public:
 	ShaderStage() = delete;
 
 	ShaderStage(Context const& context, std::vector<char>&& code, VkShaderStageFlagBits stage)
-		: m_Context{ context }
-	{
-		VkShaderModuleCreateInfo createInfo{};
-		createInfo.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-		createInfo.codeSize = code.size();
-		createInfo.pCode    = reinterpret_cast<uint32_t const*>(code.data());
-
-		if (auto const result = context.DispatchTable.createShaderModule(&createInfo, nullptr, &m_Module);
-			result != VK_SUCCESS)
-			throw std::runtime_error("failed to create shader module");
-
-		m_Info.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		m_Info.stage  = stage;
-		m_Info.module = m_Module;
-		m_Info.pName  = "main";
-	}
+		: ShaderStage(context, code, stage) {}
 
 	ShaderStage(Context const& context, std::span<char> code, VkShaderStageFlagBits stage)
 		: m_Context{ context }
