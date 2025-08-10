@@ -3,38 +3,41 @@
 #include <functional>
 #include <stack>
 
-class DeletionQueue final
+namespace vkc
 {
-public:
-	using Deleter = std::function<void()>;
-	DeletionQueue() = default;
-
-	~DeletionQueue()
+	class DeletionQueue final
 	{
-		Flush();
-	}
+	public:
+		using Deleter = std::function<void()>;
+		DeletionQueue() = default;
 
-	DeletionQueue(DeletionQueue&&)                 = delete;
-	DeletionQueue(DeletionQueue const&)            = delete;
-	DeletionQueue& operator=(DeletionQueue const&) = delete;
-	DeletionQueue& operator=(DeletionQueue&&)      = delete;
-
-	void Push(Deleter&& deleter)
-	{
-		m_Deleters.push(deleter);
-	}
-
-	void Flush()
-	{
-		while (!m_Deleters.empty())
+		~DeletionQueue()
 		{
-			m_Deleters.top()();
-			m_Deleters.pop();
+			Flush();
 		}
-	}
 
-private:
-	std::stack<Deleter> m_Deleters;
-};
+		DeletionQueue(DeletionQueue&&)                 = delete;
+		DeletionQueue(DeletionQueue const&)            = delete;
+		DeletionQueue& operator=(DeletionQueue const&) = delete;
+		DeletionQueue& operator=(DeletionQueue&&)      = delete;
+
+		void Push(Deleter&& deleter)
+		{
+			m_Deleters.push(deleter);
+		}
+
+		void Flush()
+		{
+			while (!m_Deleters.empty())
+			{
+				m_Deleters.top()();
+				m_Deleters.pop();
+			}
+		}
+
+	private:
+		std::stack<Deleter> m_Deleters;
+	};
+}
 
 #endif //DELETIONQUEUE_H

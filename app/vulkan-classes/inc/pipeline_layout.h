@@ -4,61 +4,64 @@
 
 #include "context.h"
 
-class PipelineLayout final
+namespace vkc
 {
-public:
-	~PipelineLayout() = default;
-
-	PipelineLayout(PipelineLayout&&)                 = default;
-	PipelineLayout(PipelineLayout const&)            = delete;
-	PipelineLayout& operator=(PipelineLayout&&)      = default;
-	PipelineLayout& operator=(PipelineLayout const&) = delete;
-
-	void Destroy(Context const& context) const;
-
-	operator VkPipelineLayout() const
+	class PipelineLayout final
 	{
-		return m_Layout;
-	}
+	public:
+		~PipelineLayout() = default;
 
-	operator VkPipelineLayout*()
+		PipelineLayout(PipelineLayout&&)                 = default;
+		PipelineLayout(PipelineLayout const&)            = delete;
+		PipelineLayout& operator=(PipelineLayout&&)      = default;
+		PipelineLayout& operator=(PipelineLayout const&) = delete;
+
+		void Destroy(Context const& context) const;
+
+		operator VkPipelineLayout() const
+		{
+			return m_Layout;
+		}
+
+		operator VkPipelineLayout*()
+		{
+			return &m_Layout;
+		}
+
+	private:
+		friend class PipelineLayoutBuilder;
+		PipelineLayout() = default;
+
+		VkPipelineLayout m_Layout{};
+	};
+
+	class PipelineLayoutBuilder final
 	{
-		return &m_Layout;
-	}
+	public:
+		PipelineLayoutBuilder() = delete;
 
-private:
-	friend class PipelineLayoutBuilder;
-	PipelineLayout() = default;
+		PipelineLayoutBuilder(Context& context)
+			: m_Context{ context } {}
 
-	VkPipelineLayout m_Layout{};
-};
+		~PipelineLayoutBuilder() = default;
 
-class PipelineLayoutBuilder final
-{
-public:
-	PipelineLayoutBuilder() = delete;
+		PipelineLayoutBuilder(PipelineLayoutBuilder&&)                 = delete;
+		PipelineLayoutBuilder(PipelineLayoutBuilder const&)            = delete;
+		PipelineLayoutBuilder& operator=(PipelineLayoutBuilder&&)      = delete;
+		PipelineLayoutBuilder& operator=(PipelineLayoutBuilder const&) = delete;
 
-	PipelineLayoutBuilder(Context& context)
-		: m_Context{ context } {}
+		PipelineLayoutBuilder& AddDescriptorSetLayout(VkDescriptorSetLayout layout);
 
-	~PipelineLayoutBuilder() = default;
+		PipelineLayoutBuilder& AddPushConstant(VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size);
 
-	PipelineLayoutBuilder(PipelineLayoutBuilder&&)                 = delete;
-	PipelineLayoutBuilder(PipelineLayoutBuilder const&)            = delete;
-	PipelineLayoutBuilder& operator=(PipelineLayoutBuilder&&)      = delete;
-	PipelineLayoutBuilder& operator=(PipelineLayoutBuilder const&) = delete;
+		[[nodiscard]] PipelineLayout Build(bool addToQueue = true) const;
 
-	PipelineLayoutBuilder& AddDescriptorSetLayout(VkDescriptorSetLayout layout);
+	private:
+		Context& m_Context;
 
-	PipelineLayoutBuilder& AddPushConstant(VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size);
-
-	[[nodiscard]] PipelineLayout Build(bool addToQueue = true) const;
-
-private:
-	Context& m_Context;
-
-	std::vector<VkDescriptorSetLayout> m_DescSetLayouts{};
-	std::vector<VkPushConstantRange>   m_PushConstantRanges{};
-};
+		std::vector<VkDescriptorSetLayout> m_DescSetLayouts{};
+		std::vector<VkPushConstantRange>   m_PushConstantRanges{};
+	};
+}
 
 #endif //PIPELINE_LAYOUT_H

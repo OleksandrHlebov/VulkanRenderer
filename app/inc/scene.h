@@ -17,7 +17,7 @@ class Scene final
 {
 public:
 	Scene() = delete;
-	Scene(Context& context, CommandPool& commandPool);
+	Scene(vkc::Context& context, vkc::CommandPool& commandPool);
 	~Scene() = default;
 
 	Scene(Scene&&)                 = delete;
@@ -34,29 +34,29 @@ public:
 		return m_Meshes;
 	}
 
-	[[nodiscard]] std::span<Image> GetTextureImages()
+	[[nodiscard]] std::span<vkc::Image> GetTextureImages()
 	{
 		return m_TextureImages;
 	}
 
-	[[nodiscard]] std::span<ImageView> GetTextureImageViews()
+	[[nodiscard]] std::span<vkc::ImageView> GetTextureImageViews()
 	{
 		return m_TextureImageViews;
 	}
 
 private:
-	void     ProcessNode(aiNode const* node, aiScene const* scene, CommandBuffer& commandBuffer);
-	uint32_t LoadTexture(aiTextureType, aiMaterial const* material, CommandBuffer const& commandBuffer);
+	void     ProcessNode(aiNode const* node, aiScene const* scene, vkc::CommandBuffer& commandBuffer);
+	uint32_t LoadTexture(aiTextureType, aiMaterial const* material, vkc::CommandBuffer const& commandBuffer);
 
-	Context&     m_Context;
-	CommandPool& m_CommandPool;
+	vkc::Context&     m_Context;
+	vkc::CommandPool& m_CommandPool;
 
-	std::stack<Buffer> m_StagingBuffers;
+	std::stack<vkc::Buffer> m_StagingBuffers;
 
 	std::list<Mesh> m_Meshes;
 
-	std::vector<Image>                        m_TextureImages;
-	std::vector<ImageView>                    m_TextureImageViews;
+	std::vector<vkc::Image>                   m_TextureImages;
+	std::vector<vkc::ImageView>               m_TextureImageViews;
 	std::unordered_map<std::string, uint32_t> m_LoadedTextures;
 
 	glm::vec3 m_AABBMin{ FLT_MAX };

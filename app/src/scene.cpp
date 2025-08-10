@@ -10,7 +10,7 @@
 #include "command_pool.h"
 #include "helper.h"
 
-Scene::Scene(Context& context, CommandPool& commandPool)
+Scene::Scene(vkc::Context& context, vkc::CommandPool& commandPool)
 	: m_Context{ context }
 	, m_CommandPool{ commandPool } {}
 
@@ -27,7 +27,7 @@ void Scene::LoadScene(std::string_view filename)
 	{
 		throw std::runtime_error("failed to load model " + std::string(importer.GetErrorString()));
 	}
-	CommandBuffer& commandBuffer = m_CommandPool.AllocateCommandBuffer(m_Context);
+	vkc::CommandBuffer& commandBuffer = m_CommandPool.AllocateCommandBuffer(m_Context);
 	commandBuffer.Begin(m_Context, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	ProcessNode(scene->mRootNode, scene, commandBuffer);
 	commandBuffer.End(m_Context);
@@ -49,7 +49,7 @@ void Scene::LoadFirstMeshFromFile(std::string_view filename)
 	m_Meshes.clear();
 }
 
-void Scene::ProcessNode(aiNode const* node, aiScene const* scene, CommandBuffer& commandBuffer)
+void Scene::ProcessNode(aiNode const* node, aiScene const* scene, vkc::CommandBuffer& commandBuffer)
 {
 	for (uint32_t meshIndex{}; meshIndex < node->mNumMeshes; meshIndex++)
 	{
@@ -85,23 +85,23 @@ void Scene::ProcessNode(aiNode const* node, aiScene const* scene, CommandBuffer&
 		}
 		// TODO: materials
 		TextureIndices textureIndices{};
-		textureIndices.Diffuse = LoadTexture(aiTextureType_DIFFUSE, scene->mMaterials[mesh->mMaterialIndex], commandBuffer);
-		Buffer& stagingVert    = m_StagingBuffers.emplace(BufferBuilder{ m_Context }
-													   .MapMemory()
-													   .SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
-																			   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
-													   .Build(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT
-															  , tempVertices.size() * sizeof(tempVertices[0])
-															  , false));
+		textureIndices.Diffuse   = LoadTexture(aiTextureType_DIFFUSE, scene->mMaterials[mesh->mMaterialIndex], commandBuffer);
+		vkc::Buffer& stagingVert = m_StagingBuffers.emplace(vkc::BufferBuilder{ m_Context }
+															.MapMemory()
+															.SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
+																					VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+															.Build(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+																   , tempVertices.size() * sizeof(tempVertices[0])
+																   , false));
 		stagingVert.UpdateData(tempVertices);
 
-		Buffer& stagingIndex = m_StagingBuffers.emplace(BufferBuilder{ m_Context }
-														.MapMemory()
-														.SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
-																				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
-														.Build(VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT
-															   , tempIndices.size() * sizeof(tempIndices[0])
-															   , false));
+		vkc::Buffer& stagingIndex = m_StagingBuffers.emplace(vkc::BufferBuilder{ m_Context }
+															 .MapMemory()
+															 .SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
+																					 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+															 .Build(VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+																	, tempIndices.size() * sizeof(tempIndices[0])
+																	, false));
 		stagingIndex.UpdateData(tempIndices);
 
 		m_Meshes.emplace_back(m_Context
@@ -116,7 +116,7 @@ void Scene::ProcessNode(aiNode const* node, aiScene const* scene, CommandBuffer&
 		ProcessNode(node->mChildren[index], scene, commandBuffer);
 }
 
-uint32_t Scene::LoadTexture(aiTextureType type, aiMaterial const* material, CommandBuffer const& commandBuffer)
+uint32_t Scene::LoadTexture(aiTextureType type, aiMaterial const* material, vkc::CommandBuffer const& commandBuffer)
 {
 	aiString str;
 	if (material->GetTextureCount(type))
@@ -133,27 +133,27 @@ uint32_t Scene::LoadTexture(aiTextureType type, aiMaterial const* material, Comm
 
 		std::span const span{ imageData.Pixels, imageData.Pixels + imageData.Size };
 
-		Buffer& stagingBuffer = m_StagingBuffers.emplace(BufferBuilder{ m_Context }
-														 .MapMemory()
-														 .SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-																				 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
-														 .Build(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, imageData.Size, false));
+		vkc::Buffer& stagingBuffer = m_StagingBuffers.emplace(vkc::BufferBuilder{ m_Context }
+															  .MapMemory()
+															  .SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+																					  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+															  .Build(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, imageData.Size, false));
 		stagingBuffer.UpdateData(span);
 
-		Image& image = m_TextureImages.emplace_back(ImageBuilder{ m_Context }
-													.SetType(VK_IMAGE_TYPE_2D)
-													.SetFormat(VK_FORMAT_R8G8B8A8_SRGB)
-													.SetAspectFlags(VK_IMAGE_ASPECT_COLOR_BIT)
-													.SetExtent({
-																   static_cast<uint32_t>(imageData.Width)
-																   , static_cast<uint32_t>(imageData.Height)
-															   })
-													.Build(VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT));
+		vkc::Image& image = m_TextureImages.emplace_back(vkc::ImageBuilder{ m_Context }
+														 .SetType(VK_IMAGE_TYPE_2D)
+														 .SetFormat(VK_FORMAT_R8G8B8A8_SRGB)
+														 .SetAspectFlags(VK_IMAGE_ASPECT_COLOR_BIT)
+														 .SetExtent({
+																		static_cast<uint32_t>(imageData.Width)
+																		, static_cast<uint32_t>(imageData.Height)
+																	})
+														 .Build(VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT));
 
 		m_TextureImageViews.emplace_back(image.CreateView(m_Context, VK_IMAGE_VIEW_TYPE_2D));
 		//
 		{
-			Image::Transition transition{};
+			vkc::Image::Transition transition{};
 			transition.NewLayout     = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 			transition.SrcAccessMask = VK_ACCESS_NONE;
 			transition.DstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -164,7 +164,7 @@ uint32_t Scene::LoadTexture(aiTextureType type, aiMaterial const* material, Comm
 		stagingBuffer.CopyTo(m_Context, commandBuffer, image);
 		//
 		{
-			Image::Transition transition{};
+			vkc::Image::Transition transition{};
 			transition.NewLayout     = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
 			transition.SrcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 			transition.DstAccessMask = VK_ACCESS_MEMORY_READ_BIT;

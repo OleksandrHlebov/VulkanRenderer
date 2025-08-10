@@ -4,76 +4,81 @@
 
 #include "context.h"
 
-class ShaderStage final
+namespace vkc
 {
-public:
-	ShaderStage() = delete;
-
-	ShaderStage(Context const& context, std::vector<char>&& code, VkShaderStageFlagBits stage)
-		: ShaderStage(context, code, stage) {}
-
-	ShaderStage(Context const& context, std::span<char> code, VkShaderStageFlagBits stage)
-		: m_Context{ context }
+	class ShaderStage final
 	{
-		VkShaderModuleCreateInfo createInfo{};
-		createInfo.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-		createInfo.codeSize = code.size();
-		createInfo.pCode    = reinterpret_cast<uint32_t const*>(code.data());
+	public:
+		ShaderStage() = delete;
 
-		if (auto const result = context.DispatchTable.createShaderModule(&createInfo, nullptr, &m_Module);
-			result != VK_SUCCESS)
-			throw std::runtime_error("failed to create shader module");
+		ShaderStage(Context const& context, std::vector<char>&& code, VkShaderStageFlagBits stage)
+			: ShaderStage(context, code, stage) {}
 
-		m_Info.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		m_Info.stage  = stage;
-		m_Info.module = m_Module;
-		m_Info.pName  = "main";
-	}
+		ShaderStage(Context const& context, std::span<char> code, VkShaderStageFlagBits stage)
+			: m_Context{ context }
+		{
+			VkShaderModuleCreateInfo createInfo{};
+			createInfo.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+			createInfo.codeSize = code.size();
+			createInfo.pCode    = reinterpret_cast<uint32_t const*>(code.data());
 
-	~ShaderStage()
-	{
-		m_Context.DispatchTable.destroyShaderModule(m_Module, nullptr);
-	}
+			if (auto const result = context.DispatchTable.createShaderModule(&createInfo, nullptr, &m_Module);
+				result != VK_SUCCESS)
+				throw std::runtime_error("failed to create shader module");
 
-	ShaderStage(ShaderStage&&)                 = delete;
-	ShaderStage(ShaderStage const&)            = delete;
-	ShaderStage& operator=(ShaderStage&&)      = delete;
-	ShaderStage& operator=(ShaderStage const&) = delete;
+			m_Info.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			m_Info.stage  = stage;
+			m_Info.module = m_Module;
+			m_Info.pName  = "main";
+		}
 
-	template<typename DataType>
-	void AddSpecializationConstant(DataType data)
-	{
-		auto const offset = static_cast<uint32_t>(m_SpecializationData.size());
-		m_MapEntries.emplace_back(static_cast<uint32_t>(m_MapEntries.size())
-								  , offset
-								  , sizeof(data));
+		~ShaderStage()
+		{
+			m_Context.DispatchTable.destroyShaderModule(m_Module, nullptr);
+		}
 
-		// char size is 1 byte, hence we allocate sizeof(data) amount of chars
-		m_SpecializationData.insert(m_SpecializationData.end(), sizeof(data), 0);
-		std::memcpy(&m_SpecializationData[offset], &data, sizeof(data)); // copy data into the allocated memory
+		ShaderStage(ShaderStage&&)                 = delete;
+		ShaderStage(ShaderStage const&)            = delete;
+		ShaderStage& operator=(ShaderStage&&)      = delete;
+		ShaderStage& operator=(ShaderStage const&) = delete;
 
-		m_SpecializationInfo.dataSize      = static_cast<uint32_t>(m_SpecializationData.size());
-		m_SpecializationInfo.pData         = m_SpecializationData.data();
-		m_SpecializationInfo.mapEntryCount = static_cast<uint32_t>(m_MapEntries.size());
-		m_SpecializationInfo.pMapEntries   = m_MapEntries.data();
+		template
+		<typename DataType>
 
-		m_Info.pSpecializationInfo = &m_SpecializationInfo;
-	}
+		void AddSpecializationConstant(DataType data)
+		{
+			auto const offset = static_cast<uint32_t>(m_SpecializationData.size());
+			m_MapEntries.emplace_back(static_cast<uint32_t>(m_MapEntries.size())
+									  , offset
+									  , sizeof(data));
 
-	operator VkPipelineShaderStageCreateInfo() const
-	{
-		return m_Info;
-	}
+			// char size is 1 byte, hence we allocate sizeof(data) amount of chars
+			m_SpecializationData.insert(m_SpecializationData.end(), sizeof(data), 0);
+			std::memcpy(&m_SpecializationData[offset], &data, sizeof(data)); // copy data into the allocated memory
 
-private:
-	VkShaderModule                  m_Module{};
-	VkPipelineShaderStageCreateInfo m_Info{};
-	VkSpecializationInfo            m_SpecializationInfo{};
+			m_SpecializationInfo.dataSize      = static_cast<uint32_t>(m_SpecializationData.size());
+			m_SpecializationInfo.pData         = m_SpecializationData.data();
+			m_SpecializationInfo.mapEntryCount = static_cast<uint32_t>(m_MapEntries.size());
+			m_SpecializationInfo.pMapEntries   = m_MapEntries.data();
 
-	std::vector<char>                     m_SpecializationData{};
-	std::vector<VkSpecializationMapEntry> m_MapEntries{};
+			m_Info.pSpecializationInfo = &m_SpecializationInfo;
+		}
 
-	Context const& m_Context;
-};
+		operator VkPipelineShaderStageCreateInfo() const
+		{
+			return m_Info;
+		}
+
+	private:
+		VkShaderModule                  m_Module{};
+		VkPipelineShaderStageCreateInfo m_Info{};
+		VkSpecializationInfo            m_SpecializationInfo{};
+
+		std::vector<char>                     m_SpecializationData{};
+		std::vector<VkSpecializationMapEntry> m_MapEntries{};
+
+		Context const& m_Context;
+	};
+}
 
 #endif //SHADER_STAGE_H

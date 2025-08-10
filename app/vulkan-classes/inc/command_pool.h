@@ -4,39 +4,42 @@
 
 #include "command_buffer.h"
 
-class CommandPool final
+namespace vkc
 {
-public:
-	CommandPool() = delete;
-
-	CommandPool(Context& context, uint32_t queueIndex, uint32_t bufferCount, VkCommandPoolCreateFlags flags = 0);
-
-	~CommandPool() = default;
-
-	CommandPool(CommandPool&&)                 = delete;
-	CommandPool(CommandPool const&)            = delete;
-	CommandPool& operator=(CommandPool&&)      = delete;
-	CommandPool& operator=(CommandPool const&) = delete;
-
-	CommandBuffer& AllocateCommandBuffer(Context& context);
-
-	void Destroy(Context const& context) const;
-
-	operator VkCommandPool*()
+	class CommandPool final
 	{
-		return &m_Pool;
-	}
+	public:
+		CommandPool() = delete;
 
-	operator VkCommandPool() const
-	{
-		return m_Pool;
-	}
+		CommandPool(Context& context, uint32_t queueIndex, uint32_t bufferCount, VkCommandPoolCreateFlags flags = 0);
 
-private:
-	VkCommandPool m_Pool{};
+		~CommandPool() = default;
 
-	// list to avoid breaking references, it is read only sequentially everytime anyway
-	std::list<CommandBuffer> m_CommandBuffers;
-};
+		CommandPool(CommandPool&&)                 = delete;
+		CommandPool(CommandPool const&)            = delete;
+		CommandPool& operator=(CommandPool&&)      = delete;
+		CommandPool& operator=(CommandPool const&) = delete;
+
+		CommandBuffer& AllocateCommandBuffer(Context& context);
+
+		void Destroy(Context const& context) const;
+
+		operator VkCommandPool*()
+		{
+			return &m_Pool;
+		}
+
+		operator VkCommandPool() const
+		{
+			return m_Pool;
+		}
+
+	private:
+		VkCommandPool m_Pool{};
+
+		// list to avoid breaking references, it is read only sequentially everytime anyway
+		std::list<CommandBuffer> m_CommandBuffers;
+	};
+}
 
 #endif //COMMAND_POOL_H

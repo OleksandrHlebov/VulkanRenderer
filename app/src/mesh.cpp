@@ -5,19 +5,19 @@
 
 Mesh::Mesh
 (
-	Context&                  context
-	, CommandBuffer const&    commandBuffer
-	, std::vector<Vertex>&&   vertices, Buffer const& stagingVert
-	, std::vector<uint32_t>&& indices, Buffer const&  stagingIndex
-	, TextureIndices          textureIndices
+	vkc::Context&               context
+	, vkc::CommandBuffer const& commandBuffer
+	, std::vector<Vertex>&&     vertices, vkc::Buffer const& stagingVert
+	, std::vector<uint32_t>&&   indices, vkc::Buffer const&  stagingIndex
+	, TextureIndices            textureIndices
 )
 	: m_Vertices(std::move(vertices))
-	, m_VertexBuffer(BufferBuilder{ context }
+	, m_VertexBuffer(vkc::BufferBuilder{ context }
 					 .SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
 					 .Build(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
 							, m_Vertices.size() * sizeof(m_Vertices[0])))
 	, m_Indices(std::move(indices))
-	, m_IndexBuffer(BufferBuilder{ context }
+	, m_IndexBuffer(vkc::BufferBuilder{ context }
 					.SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
 					.Build(VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
 						   , m_Indices.size() * sizeof(m_Indices[0])))

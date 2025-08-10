@@ -1,6 +1,6 @@
 #include "image_view.h"
 
-void ImageView::ConvertFromSwapchainVkImageViews(Context& context, std::vector<ImageView>& convertedViews)
+void vkc::ImageView::ConvertFromSwapchainVkImageViews(Context& context, std::vector<ImageView>& convertedViews)
 {
 	convertedViews.clear();
 	convertedViews.reserve(context.Swapchain.image_count);
@@ -15,7 +15,7 @@ void ImageView::ConvertFromSwapchainVkImageViews(Context& context, std::vector<I
 	}
 }
 
-void ImageView::Destroy(Context const& context) const
+void vkc::ImageView::Destroy(Context const& context) const
 {
 	context.DispatchTable.destroyImageView(*this, nullptr);
 }

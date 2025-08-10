@@ -7,21 +7,24 @@
 
 #include "GLFW/glfw3.h"
 
-struct Context
+namespace vkc
 {
-	DeletionQueue DeletionQueue;
-	VmaAllocator  Allocator;
+	struct Context
+	{
+		DeletionQueue DeletionQueue;
+		VmaAllocator  Allocator;
 
-	GLFWwindow*                Window{};
-	vkb::Instance              Instance;
-	vkb::InstanceDispatchTable InstanceDispatchTable;
-	VkSurfaceKHR               Surface{};
-	vkb::Device                Device;
-	vkb::DispatchTable         DispatchTable;
-	vkb::Swapchain             Swapchain;
+		GLFWwindow*                Window{};
+		vkb::Instance              Instance;
+		vkb::InstanceDispatchTable InstanceDispatchTable;
+		VkSurfaceKHR               Surface{};
+		vkb::Device                Device;
+		vkb::DispatchTable         DispatchTable;
+		vkb::Swapchain             Swapchain;
 
-	VkQueue GraphicsQueue{};
-	VkQueue PresentQueue{};
-};
+		VkQueue GraphicsQueue{};
+		VkQueue PresentQueue{};
+	};
+}
 
 #endif //CONTEXT_H

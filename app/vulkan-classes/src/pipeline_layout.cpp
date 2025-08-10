@@ -1,23 +1,23 @@
 #include "pipeline_layout.h"
 
-void PipelineLayout::Destroy(Context const& context) const
+void vkc::PipelineLayout::Destroy(Context const& context) const
 {
 	context.DispatchTable.destroyPipelineLayout(m_Layout, nullptr);
 }
 
-PipelineLayoutBuilder& PipelineLayoutBuilder::AddDescriptorSetLayout(VkDescriptorSetLayout layout)
+vkc::PipelineLayoutBuilder& vkc::PipelineLayoutBuilder::AddDescriptorSetLayout(VkDescriptorSetLayout layout)
 {
 	m_DescSetLayouts.emplace_back(layout);
 	return *this;
 }
 
-PipelineLayoutBuilder& PipelineLayoutBuilder::AddPushConstant(VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size)
+vkc::PipelineLayoutBuilder& vkc::PipelineLayoutBuilder::AddPushConstant(VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size)
 {
 	m_PushConstantRanges.emplace_back(stageFlags, offset, size);
 	return *this;
 }
 
-PipelineLayout PipelineLayoutBuilder::Build(bool addToQueue) const
+vkc::PipelineLayout vkc::PipelineLayoutBuilder::Build(bool addToQueue) const
 {
 	PipelineLayout layout{};
 

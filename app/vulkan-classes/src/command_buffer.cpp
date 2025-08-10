@@ -1,6 +1,6 @@
 #include "command_buffer.h"
 
-CommandBuffer::Status CommandBuffer::GetStatus(Context const& context)
+vkc::CommandBuffer::Status vkc::CommandBuffer::GetStatus(Context const& context)
 {
 	if (m_Status != Status::Submitted)
 		return m_Status;
@@ -11,12 +11,12 @@ CommandBuffer::Status CommandBuffer::GetStatus(Context const& context)
 	return m_Status;
 }
 
-VkFence const& CommandBuffer::GetFence() const
+VkFence const& vkc::CommandBuffer::GetFence() const
 {
 	return m_Fence;
 }
 
-void CommandBuffer::Begin(Context const& context, VkCommandBufferUsageFlags usage)
+void vkc::CommandBuffer::Begin(Context const& context, VkCommandBufferUsageFlags usage)
 {
 	assert(m_Status == Status::Ready);
 	VkCommandBufferBeginInfo beginInfo{};
@@ -26,14 +26,14 @@ void CommandBuffer::Begin(Context const& context, VkCommandBufferUsageFlags usag
 	m_Status = Status::Recording;
 }
 
-void CommandBuffer::End(Context const& context)
+void vkc::CommandBuffer::End(Context const& context)
 {
 	assert(m_Status == Status::Recording);
 	context.DispatchTable.endCommandBuffer(*this);
 	m_Status = Status::Executable;
 }
 
-void CommandBuffer::Submit
+void vkc::CommandBuffer::Submit
 (
 	Context const&                     context
 	, VkQueue                          queue
@@ -74,7 +74,7 @@ void CommandBuffer::Submit
 	m_Status = Status::Submitted;
 }
 
-CommandBuffer::CommandBuffer(Context& context, VkCommandPool commandPool, VkCommandBuffer buffer)
+vkc::CommandBuffer::CommandBuffer(Context& context, VkCommandPool commandPool, VkCommandBuffer buffer)
 	: m_Pool{ commandPool }
 	, m_CommandBuffer{ buffer }
 {

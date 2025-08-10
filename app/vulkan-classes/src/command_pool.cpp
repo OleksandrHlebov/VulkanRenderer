@@ -1,6 +1,6 @@
 #include "command_pool.h"
 
-CommandPool::CommandPool(Context& context, uint32_t queueIndex, uint32_t bufferCount, VkCommandPoolCreateFlags flags)
+vkc::CommandPool::CommandPool(Context& context, uint32_t queueIndex, uint32_t bufferCount, VkCommandPoolCreateFlags flags)
 {
 	VkCommandPoolCreateInfo poolInfo{};
 	poolInfo.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -32,7 +32,7 @@ CommandPool::CommandPool(Context& context, uint32_t queueIndex, uint32_t bufferC
 	});
 }
 
-CommandBuffer& CommandPool::AllocateCommandBuffer(Context& context)
+vkc::CommandBuffer& vkc::CommandPool::AllocateCommandBuffer(Context& context)
 {
 	CommandBuffer* foundBuffer{};
 
@@ -65,7 +65,7 @@ CommandBuffer& CommandPool::AllocateCommandBuffer(Context& context)
 	return m_CommandBuffers.back();
 }
 
-void CommandPool::Destroy(Context const& context) const
+void vkc::CommandPool::Destroy(Context const& context) const
 {
 	context.DispatchTable.destroyCommandPool(m_Pool, nullptr);
 }

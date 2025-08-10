@@ -1,6 +1,6 @@
 #include "image.h"
 
-ImageView Image::CreateView
+vkc::ImageView vkc::Image::CreateView
 (
 	Context& context, VkImageViewType type, uint32_t baseLayer, uint32_t layerCount, uint32_t baseMipLevel, uint32_t levelCount, bool
 	addToQueue
@@ -33,12 +33,12 @@ ImageView Image::CreateView
 	return imageView;
 }
 
-void Image::Destroy(Context const& context) const
+void vkc::Image::Destroy(Context const& context) const
 {
 	vmaDestroyImage(context.Allocator, *this, m_Allocation);
 }
 
-void Image::MakeTransition(Context const& context, VkCommandBuffer commandBuffer, Transition const& transition)
+void vkc::Image::MakeTransition(Context const& context, VkCommandBuffer commandBuffer, Transition const& transition)
 {
 	VkImageMemoryBarrier2 memoryBarrier{};
 	memoryBarrier.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -70,7 +70,7 @@ void Image::MakeTransition(Context const& context, VkCommandBuffer commandBuffer
 			m_Layouts[transition.BaseMipLevel + mipLevel][transition.BaseLayer + layer] = transition.NewLayout;
 }
 
-void Image::MakeTransition
+void vkc::Image::MakeTransition
 (
 	Context const&        context,
 	VkCommandBuffer       commandBuffer,
@@ -99,7 +99,7 @@ void Image::MakeTransition
 	MakeTransition(context, commandBuffer, transition);
 }
 
-void Image::ConvertFromSwapchainVkImages(Context& context, std::vector<Image>& convertedImages)
+void vkc::Image::ConvertFromSwapchainVkImages(Context& context, std::vector<Image>& convertedImages)
 {
 	convertedImages.clear();
 	convertedImages.reserve(context.Swapchain.image_count);
@@ -121,67 +121,67 @@ void Image::ConvertFromSwapchainVkImages(Context& context, std::vector<Image>& c
 	}
 }
 
-ImageBuilder& ImageBuilder::SetFormat(VkFormat format)
+vkc::ImageBuilder& vkc::ImageBuilder::SetFormat(VkFormat format)
 {
 	m_Format = format;
 	return *this;
 }
 
-ImageBuilder& ImageBuilder::SetTiling(VkImageTiling tiling)
+vkc::ImageBuilder& vkc::ImageBuilder::SetTiling(VkImageTiling tiling)
 {
 	m_Tiling = tiling;
 	return *this;
 }
 
-ImageBuilder& ImageBuilder::SetAspectFlags(VkImageAspectFlags aspectFlags)
+vkc::ImageBuilder& vkc::ImageBuilder::SetAspectFlags(VkImageAspectFlags aspectFlags)
 {
 	m_AspectFlags = aspectFlags;
 	return *this;
 }
 
-ImageBuilder& ImageBuilder::SetLayers(uint32_t layers)
+vkc::ImageBuilder& vkc::ImageBuilder::SetLayers(uint32_t layers)
 {
 	m_Layers = layers;
 	return *this;
 }
 
-ImageBuilder& ImageBuilder::SetMipLevels(uint32_t mipLevels)
+vkc::ImageBuilder& vkc::ImageBuilder::SetMipLevels(uint32_t mipLevels)
 {
 	m_MipLevels = mipLevels;
 	return *this;
 }
 
-ImageBuilder& ImageBuilder::SetType(VkImageType type)
+vkc::ImageBuilder& vkc::ImageBuilder::SetType(VkImageType type)
 {
 	m_ImageType = type;
 	return *this;
 }
 
-ImageBuilder& ImageBuilder::SetExtent(VkExtent2D extent)
+vkc::ImageBuilder& vkc::ImageBuilder::SetExtent(VkExtent2D extent)
 {
 	m_Extent = extent;
 	return *this;
 }
 
-ImageBuilder& ImageBuilder::SetMemoryUsage(VmaMemoryUsage memoryUsage)
+vkc::ImageBuilder& vkc::ImageBuilder::SetMemoryUsage(VmaMemoryUsage memoryUsage)
 {
 	m_MemoryUsage = memoryUsage;
 	return *this;
 }
 
-ImageBuilder& ImageBuilder::SetFlags(VkImageCreateFlags flags)
+vkc::ImageBuilder& vkc::ImageBuilder::SetFlags(VkImageCreateFlags flags)
 {
 	m_CreationFlags = flags;
 	return *this;
 }
 
-ImageBuilder& ImageBuilder::SetSharingMode(VkSharingMode sharingMode)
+vkc::ImageBuilder& vkc::ImageBuilder::SetSharingMode(VkSharingMode sharingMode)
 {
 	m_SharingMode = sharingMode;
 	return *this;
 }
 
-Image ImageBuilder::Build(VkImageUsageFlags usage, bool addToQueue) const
+vkc::Image vkc::ImageBuilder::Build(VkImageUsageFlags usage, bool addToQueue) const
 {
 	VkImageCreateInfo createInfo{};
 	createInfo.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;

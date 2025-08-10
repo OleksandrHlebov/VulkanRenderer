@@ -2,12 +2,12 @@
 
 #include "shader_stage.h"
 
-void Pipeline::Destroy(Context const& context) const
+void vkc::Pipeline::Destroy(Context const& context) const
 {
 	context.DispatchTable.destroyPipeline(m_Pipeline, nullptr);
 }
 
-PipelineBuilder::PipelineBuilder(Context& context)
+vkc::PipelineBuilder::PipelineBuilder(Context& context)
 	: m_Context{ context }
 {
 	m_VertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -39,13 +39,13 @@ PipelineBuilder::PipelineBuilder(Context& context)
 	m_DepthStencilState.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 }
 
-PipelineBuilder& PipelineBuilder::AddShaderStage(ShaderStage const& shaderStage)
+vkc::PipelineBuilder& vkc::PipelineBuilder::AddShaderStage(ShaderStage const& shaderStage)
 {
 	m_ShaderStages.emplace_back(shaderStage);
 	return *this;
 }
 
-PipelineBuilder& PipelineBuilder::SetRenderingAttachments
+vkc::PipelineBuilder& vkc::PipelineBuilder::SetRenderingAttachments
 (std::span<VkFormat> colorAttachmentFormats, VkFormat depthFormat, VkFormat stencilFormat)
 {
 	m_PipelineRendering.colorAttachmentCount = static_cast<uint32_t>(colorAttachmentFormats.size());
@@ -57,7 +57,7 @@ PipelineBuilder& PipelineBuilder::SetRenderingAttachments
 	return *this;
 }
 
-PipelineBuilder& PipelineBuilder::SetVertexDescription
+vkc::PipelineBuilder& vkc::PipelineBuilder::SetVertexDescription
 (std::span<VkVertexInputBindingDescription> bindingDesc, std::span<VkVertexInputAttributeDescription> attributeDesc)
 {
 	m_VertexInputState.sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -70,13 +70,13 @@ PipelineBuilder& PipelineBuilder::SetVertexDescription
 	return *this;
 }
 
-PipelineBuilder& PipelineBuilder::SetTopology(VkPrimitiveTopology topology)
+vkc::PipelineBuilder& vkc::PipelineBuilder::SetTopology(VkPrimitiveTopology topology)
 {
 	m_InputAssembly.topology = topology;
 	return *this;
 }
 
-PipelineBuilder& PipelineBuilder::AddViewport(VkExtent2D const& extent)
+vkc::PipelineBuilder& vkc::PipelineBuilder::AddViewport(VkExtent2D const& extent)
 {
 	VkViewport viewport{};
 	viewport.width    = static_cast<float>(extent.width);
@@ -92,7 +92,7 @@ PipelineBuilder& PipelineBuilder::AddViewport(VkExtent2D const& extent)
 	return *this;
 }
 
-PipelineBuilder& PipelineBuilder::SetDepthBias(float constantFactor, float slopeFactor, float clamp, bool clampEnable)
+vkc::PipelineBuilder& vkc::PipelineBuilder::SetDepthBias(float constantFactor, float slopeFactor, float clamp, bool clampEnable)
 {
 	m_Rasterizer.depthClampEnable        = clampEnable;
 	m_Rasterizer.depthBiasConstantFactor = constantFactor;
@@ -101,44 +101,44 @@ PipelineBuilder& PipelineBuilder::SetDepthBias(float constantFactor, float slope
 	return *this;
 }
 
-PipelineBuilder& PipelineBuilder::SetCullMode(VkCullModeFlagBits cullMode)
+vkc::PipelineBuilder& vkc::PipelineBuilder::SetCullMode(VkCullModeFlagBits cullMode)
 {
 	m_Rasterizer.cullMode = cullMode;
 	return *this;
 }
 
-PipelineBuilder& PipelineBuilder::SetFrontFace(VkFrontFace frontFace)
+vkc::PipelineBuilder& vkc::PipelineBuilder::SetFrontFace(VkFrontFace frontFace)
 {
 	m_Rasterizer.frontFace = frontFace;
 	return *this;
 }
 
-PipelineBuilder& PipelineBuilder::SetPolygonMode(VkPolygonMode polygonMode)
+vkc::PipelineBuilder& vkc::PipelineBuilder::SetPolygonMode(VkPolygonMode polygonMode)
 {
 	m_Rasterizer.polygonMode = polygonMode;
 	return *this;
 }
 
-PipelineBuilder& PipelineBuilder::AddDynamicState(VkDynamicState dynamicState)
+vkc::PipelineBuilder& vkc::PipelineBuilder::AddDynamicState(VkDynamicState dynamicState)
 {
 	m_DynamicStates.emplace_back(dynamicState);
 	return *this;
 }
 
-PipelineBuilder& PipelineBuilder::EnableDepthTest(VkCompareOp op, VkBool32 enable)
+vkc::PipelineBuilder& vkc::PipelineBuilder::EnableDepthTest(VkCompareOp op, VkBool32 enable)
 {
 	m_DepthStencilState.depthTestEnable = enable;
 	m_DepthStencilState.depthCompareOp  = op;
 	return *this;
 }
 
-PipelineBuilder& PipelineBuilder::EnableDepthWrite(VkBool32 enable)
+vkc::PipelineBuilder& vkc::PipelineBuilder::EnableDepthWrite(VkBool32 enable)
 {
 	m_DepthStencilState.depthWriteEnable = enable;
 	return *this;
 }
 
-Pipeline PipelineBuilder::Build(PipelineLayout const& layout, bool addToQueue)
+vkc::Pipeline vkc::PipelineBuilder::Build(PipelineLayout const& layout, bool addToQueue)
 {
 	Pipeline pipeline{};
 

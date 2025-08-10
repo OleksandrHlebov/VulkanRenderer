@@ -1,7 +1,6 @@
 #ifndef MESH_H
 #define MESH_H
 
-#include <memory>
 #include <vector>
 
 #include "buffer.h"
@@ -13,11 +12,11 @@ class Mesh final
 public:
 	Mesh
 	(
-		Context&                  context
-		, CommandBuffer const&    commandBuffer
-		, std::vector<Vertex>&&   vertices, Buffer const& stagingVert
-		, std::vector<uint32_t>&& indices, Buffer const&  stagingIndex
-		, TextureIndices          textureIndices
+		vkc::Context&               context
+		, vkc::CommandBuffer const& commandBuffer
+		, std::vector<Vertex>&&     vertices, vkc::Buffer const& stagingVert
+		, std::vector<uint32_t>&&   indices, vkc::Buffer const&  stagingIndex
+		, TextureIndices            textureIndices
 	);
 	~Mesh() = default;
 
@@ -26,12 +25,12 @@ public:
 	Mesh& operator=(Mesh&&)      = delete;
 	Mesh& operator=(Mesh const&) = delete;
 
-	[[nodiscard]] Buffer const& GetVertexBuffer() const
+	[[nodiscard]] vkc::Buffer const& GetVertexBuffer() const
 	{
 		return m_VertexBuffer;
 	}
 
-	[[nodiscard]] Buffer const& GetIndexBuffer() const
+	[[nodiscard]] vkc::Buffer const& GetIndexBuffer() const
 	{
 		return m_IndexBuffer;
 	}
@@ -62,10 +61,10 @@ private:
 	glm::mat4 m_ModelMatrix{};
 
 	std::vector<Vertex> m_Vertices;
-	Buffer              m_VertexBuffer;
+	vkc::Buffer         m_VertexBuffer;
 
 	std::vector<uint32_t> m_Indices;
-	Buffer                m_IndexBuffer;
+	vkc::Buffer           m_IndexBuffer;
 
 	TextureIndices m_TextureIndices;
 

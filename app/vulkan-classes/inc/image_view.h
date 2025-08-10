@@ -2,65 +2,68 @@
 #define IMAGE_VIEW_H
 #include "context.h"
 
-class ImageView final
+namespace vkc
 {
-public:
-	~ImageView() = default;
-
-	ImageView(ImageView&&)                 = default;
-	ImageView(ImageView const&)            = delete;
-	ImageView& operator=(ImageView&&)      = default;
-	ImageView& operator=(ImageView const&) = delete;
-
-	static void ConvertFromSwapchainVkImageViews(Context& context, std::vector<ImageView>& convertedViews);
-
-	uint32_t GetBaseLayer() const
+	class ImageView final
 	{
-		return m_BaseLayer;
-	}
+	public:
+		~ImageView() = default;
 
-	uint32_t GetLayerCount() const
-	{
-		return m_LayerCount;
-	}
+		ImageView(ImageView&&)                 = default;
+		ImageView(ImageView const&)            = delete;
+		ImageView& operator=(ImageView&&)      = default;
+		ImageView& operator=(ImageView const&) = delete;
 
-	uint32_t GetBaseMipLevel() const
-	{
-		return m_BaseMipLevel;
-	}
+		static void ConvertFromSwapchainVkImageViews(Context& context, std::vector<ImageView>& convertedViews);
 
-	uint32_t GetMipLevelCount() const
-	{
-		return m_MipLevelCount;
-	}
+		[[nodiscard]] uint32_t GetBaseLayer() const
+		{
+			return m_BaseLayer;
+		}
 
-	uint32_t GetType() const
-	{
-		return m_Type;
-	}
+		[[nodiscard]] uint32_t GetLayerCount() const
+		{
+			return m_LayerCount;
+		}
 
-	void Destroy(Context const& context) const;
+		[[nodiscard]] uint32_t GetBaseMipLevel() const
+		{
+			return m_BaseMipLevel;
+		}
 
-	operator VkImageView() const
-	{
-		return m_ImageView;
-	}
+		[[nodiscard]] uint32_t GetMipLevelCount() const
+		{
+			return m_MipLevelCount;
+		}
 
-	operator VkImageView*()
-	{
-		return &m_ImageView;
-	}
+		[[nodiscard]] uint32_t GetType() const
+		{
+			return m_Type;
+		}
 
-private:
-	friend class Image;
-	ImageView() = default;
+		void Destroy(Context const& context) const;
 
-	VkImageView     m_ImageView{};
-	VkImageViewType m_Type{};
-	uint32_t        m_BaseLayer{};
-	uint32_t        m_BaseMipLevel{};
-	uint32_t        m_LayerCount{};
-	uint32_t        m_MipLevelCount{};
-};
+		operator VkImageView() const
+		{
+			return m_ImageView;
+		}
+
+		operator VkImageView*()
+		{
+			return &m_ImageView;
+		}
+
+	private:
+		friend class Image;
+		ImageView() = default;
+
+		VkImageView     m_ImageView{};
+		VkImageViewType m_Type{};
+		uint32_t        m_BaseLayer{};
+		uint32_t        m_BaseMipLevel{};
+		uint32_t        m_LayerCount{};
+		uint32_t        m_MipLevelCount{};
+	};
+}
 
 #endif //IMAGE_VIEW_H

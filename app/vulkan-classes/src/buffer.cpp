@@ -1,6 +1,6 @@
 #include "buffer.h"
 
-void Buffer::CopyTo(Context const& context, CommandBuffer const& commandBuffer, Buffer const& dst) const
+void vkc::Buffer::CopyTo(Context const& context, CommandBuffer const& commandBuffer, Buffer const& dst) const
 {
 	assert(this->GetSize() == dst.GetSize());
 
@@ -20,7 +20,7 @@ void Buffer::CopyTo(Context const& context, CommandBuffer const& commandBuffer, 
 	context.DispatchTable.cmdCopyBuffer2(commandBuffer, &info);
 }
 
-void Buffer::CopyTo(Context const& context, CommandBuffer const& commandBuffer, Image const& dst) const
+void vkc::Buffer::CopyTo(Context const& context, CommandBuffer const& commandBuffer, Image const& dst) const
 {
 	VkBufferImageCopy2 copyRegion{};
 	copyRegion.sType             = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2;
@@ -45,45 +45,45 @@ void Buffer::CopyTo(Context const& context, CommandBuffer const& commandBuffer, 
 	context.DispatchTable.cmdCopyBufferToImage2(commandBuffer, &copyImageInfo);
 }
 
-void Buffer::Destroy(Context const& context) const
+void vkc::Buffer::Destroy(Context const& context) const
 {
 	if (m_Data)
 		vmaUnmapMemory(context.Allocator, m_Allocation);
 	vmaDestroyBuffer(context.Allocator, *this, m_Allocation);
 }
 
-BufferBuilder::BufferBuilder(Context& context)
+vkc::BufferBuilder::BufferBuilder(Context& context)
 	: m_Context{ context }
 {
 	m_BufferCreateInfo.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	m_BufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 }
 
-BufferBuilder& BufferBuilder::SetSharingMode(VkSharingMode sharingMode)
+vkc::BufferBuilder& vkc::BufferBuilder::SetSharingMode(VkSharingMode sharingMode)
 {
 	m_BufferCreateInfo.sharingMode = sharingMode;
 	return *this;
 }
 
-BufferBuilder& BufferBuilder::SetMemoryUsage(VmaMemoryUsage memoryUsage)
+vkc::BufferBuilder& vkc::BufferBuilder::SetMemoryUsage(VmaMemoryUsage memoryUsage)
 {
 	m_AllocationCreateInfo.usage = memoryUsage;
 	return *this;
 }
 
-BufferBuilder& BufferBuilder::SetRequiredMemoryFlags(VkMemoryPropertyFlags flags)
+vkc::BufferBuilder& vkc::BufferBuilder::SetRequiredMemoryFlags(VkMemoryPropertyFlags flags)
 {
 	m_AllocationCreateInfo.requiredFlags = flags;
 	return *this;
 }
 
-BufferBuilder& BufferBuilder::MapMemory(bool map)
+vkc::BufferBuilder& vkc::BufferBuilder::MapMemory(bool map)
 {
 	m_MapMemory = map;
 	return *this;
 }
 
-Buffer BufferBuilder::Build(VkBufferUsageFlags usage, VkDeviceSize size, bool addToQueue)
+vkc::Buffer vkc::BufferBuilder::Build(VkBufferUsageFlags usage, VkDeviceSize size, bool addToQueue)
 {
 	Buffer buffer{};
 

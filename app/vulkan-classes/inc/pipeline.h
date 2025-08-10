@@ -6,93 +6,96 @@
 #include "pipeline_layout.h"
 #include "shader_stage.h"
 
-class Pipeline final
+namespace vkc
 {
-public:
-	~Pipeline() = default;
-
-	Pipeline(Pipeline&&)                 = default;
-	Pipeline(Pipeline const&)            = delete;
-	Pipeline& operator=(Pipeline&&)      = default;
-	Pipeline& operator=(Pipeline const&) = delete;
-
-	void Destroy(Context const& context) const;
-
-	operator VkPipeline() const
+	class Pipeline final
 	{
-		return m_Pipeline;
-	}
+	public:
+		~Pipeline() = default;
 
-	operator VkPipeline*()
+		Pipeline(Pipeline&&)                 = default;
+		Pipeline(Pipeline const&)            = delete;
+		Pipeline& operator=(Pipeline&&)      = default;
+		Pipeline& operator=(Pipeline const&) = delete;
+
+		void Destroy(Context const& context) const;
+
+		operator VkPipeline() const
+		{
+			return m_Pipeline;
+		}
+
+		operator VkPipeline*()
+		{
+			return &m_Pipeline;
+		}
+
+	private:
+		friend class PipelineBuilder;
+		Pipeline() = default;
+
+		VkPipeline m_Pipeline{};
+	};
+
+	class PipelineBuilder final
 	{
-		return &m_Pipeline;
-	}
+	public:
+		PipelineBuilder() = delete;
 
-private:
-	friend class PipelineBuilder;
-	Pipeline() = default;
+		PipelineBuilder(Context& context);
 
-	VkPipeline m_Pipeline{};
-};
+		~PipelineBuilder() = default;
 
-class PipelineBuilder final
-{
-public:
-	PipelineBuilder() = delete;
+		PipelineBuilder(PipelineBuilder&&)                 = delete;
+		PipelineBuilder(PipelineBuilder const&)            = delete;
+		PipelineBuilder& operator=(PipelineBuilder&&)      = delete;
+		PipelineBuilder& operator=(PipelineBuilder const&) = delete;
 
-	PipelineBuilder(Context& context);
+		PipelineBuilder& AddShaderStage(ShaderStage const& shaderStage);
 
-	~PipelineBuilder() = default;
+		PipelineBuilder& SetRenderingAttachments(std::span<VkFormat> colorAttachmentFormats, VkFormat depthFormat, VkFormat stencilFormat);
 
-	PipelineBuilder(PipelineBuilder&&)                 = delete;
-	PipelineBuilder(PipelineBuilder const&)            = delete;
-	PipelineBuilder& operator=(PipelineBuilder&&)      = delete;
-	PipelineBuilder& operator=(PipelineBuilder const&) = delete;
+		PipelineBuilder& SetVertexDescription
+		(std::span<VkVertexInputBindingDescription> bindingDesc, std::span<VkVertexInputAttributeDescription> attributeDesc);
 
-	PipelineBuilder& AddShaderStage(ShaderStage const& shaderStage);
+		PipelineBuilder& SetTopology(VkPrimitiveTopology topology);
 
-	PipelineBuilder& SetRenderingAttachments(std::span<VkFormat> colorAttachmentFormats, VkFormat depthFormat, VkFormat stencilFormat);
+		PipelineBuilder& AddViewport(VkExtent2D const& extent);
 
-	PipelineBuilder& SetVertexDescription
-	(std::span<VkVertexInputBindingDescription> bindingDesc, std::span<VkVertexInputAttributeDescription> attributeDesc);
+		PipelineBuilder& SetDepthBias(float constantFactor, float slopeFactor, float clamp = .0f, bool clampEnable = true);
 
-	PipelineBuilder& SetTopology(VkPrimitiveTopology topology);
+		PipelineBuilder& SetCullMode(VkCullModeFlagBits cullMode);
 
-	PipelineBuilder& AddViewport(VkExtent2D const& extent);
+		PipelineBuilder& SetFrontFace(VkFrontFace frontFace);
 
-	PipelineBuilder& SetDepthBias(float constantFactor, float slopeFactor, float clamp = .0f, bool clampEnable = true);
+		PipelineBuilder& SetPolygonMode(VkPolygonMode polygonMode);
 
-	PipelineBuilder& SetCullMode(VkCullModeFlagBits cullMode);
+		PipelineBuilder& AddDynamicState(VkDynamicState dynamicState);
 
-	PipelineBuilder& SetFrontFace(VkFrontFace frontFace);
+		PipelineBuilder& EnableDepthTest(VkCompareOp op, VkBool32 enable = VK_TRUE);
 
-	PipelineBuilder& SetPolygonMode(VkPolygonMode polygonMode);
+		PipelineBuilder& EnableDepthWrite(VkBool32 enable = VK_TRUE);
 
-	PipelineBuilder& AddDynamicState(VkDynamicState dynamicState);
+		[[nodiscard]] Pipeline Build(PipelineLayout const& layout, bool addToQueue = true);
 
-	PipelineBuilder& EnableDepthTest(VkCompareOp op, VkBool32 enable = VK_TRUE);
+	private:
+		Context& m_Context;
 
-	PipelineBuilder& EnableDepthWrite(VkBool32 enable = VK_TRUE);
+		VkPipelineRenderingCreateInfo m_PipelineRendering{};
 
-	[[nodiscard]] Pipeline Build(PipelineLayout const& layout, bool addToQueue = true);
-
-private:
-	Context& m_Context;
-
-	VkPipelineRenderingCreateInfo m_PipelineRendering{};
-
-	std::vector<VkRect2D>                        m_Scissors{};
-	std::vector<VkViewport>                      m_Viewports{};
-	std::vector<VkPipelineShaderStageCreateInfo> m_ShaderStages{};
-	std::vector<VkDynamicState>                  m_DynamicStates{};
-	VkPipelineVertexInputStateCreateInfo         m_VertexInputState{};
-	VkPipelineInputAssemblyStateCreateInfo       m_InputAssembly{};
-	VkPipelineViewportStateCreateInfo            m_ViewportState{};
-	VkPipelineRasterizationStateCreateInfo       m_Rasterizer{};
-	VkPipelineMultisampleStateCreateInfo         m_MultisampleState{};
-	VkPipelineColorBlendAttachmentState          m_ColorBlendAttachment{};
-	VkPipelineColorBlendStateCreateInfo          m_ColorBlendState{};
-	VkPipelineDepthStencilStateCreateInfo        m_DepthStencilState{};
-};
+		std::vector<VkRect2D>                        m_Scissors{};
+		std::vector<VkViewport>                      m_Viewports{};
+		std::vector<VkPipelineShaderStageCreateInfo> m_ShaderStages{};
+		std::vector<VkDynamicState>                  m_DynamicStates{};
+		VkPipelineVertexInputStateCreateInfo         m_VertexInputState{};
+		VkPipelineInputAssemblyStateCreateInfo       m_InputAssembly{};
+		VkPipelineViewportStateCreateInfo            m_ViewportState{};
+		VkPipelineRasterizationStateCreateInfo       m_Rasterizer{};
+		VkPipelineMultisampleStateCreateInfo         m_MultisampleState{};
+		VkPipelineColorBlendAttachmentState          m_ColorBlendAttachment{};
+		VkPipelineColorBlendStateCreateInfo          m_ColorBlendState{};
+		VkPipelineDepthStencilStateCreateInfo        m_DepthStencilState{};
+	};
+}
 
 #endif //PIPELINE_H

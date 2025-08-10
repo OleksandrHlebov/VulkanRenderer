@@ -1,12 +1,12 @@
 #include "descriptor_pool.h"
 
-DescriptorPoolBuilder& DescriptorPoolBuilder::AddPoolSize(VkDescriptorType type, uint32_t count)
+vkc::DescriptorPoolBuilder& vkc::DescriptorPoolBuilder::AddPoolSize(VkDescriptorType type, uint32_t count)
 {
 	m_DescriptorPoolSizes.emplace_back(type, count);
 	return *this;
 }
 
-DescriptorPool DescriptorPoolBuilder::Build(uint32_t maxSets, bool addToQueue)
+vkc::DescriptorPool vkc::DescriptorPoolBuilder::Build(uint32_t maxSets, bool addToQueue)
 {
 	DescriptorPool pool{};
 
@@ -18,7 +18,7 @@ DescriptorPool DescriptorPoolBuilder::Build(uint32_t maxSets, bool addToQueue)
 
 	if (auto const result = m_Context.DispatchTable.createDescriptorPool(&poolCreateInfo, nullptr, pool);
 		result != VK_SUCCESS)
-		throw std::runtime_error("Failed to create descriptor pool " + result);
+		throw std::runtime_error("Failed to create descriptor pool " + std::to_string(result));
 
 	if (addToQueue)
 		m_Context.DeletionQueue.Push([context = &m_Context, pool = pool.m_DescPool]

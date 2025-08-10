@@ -1,14 +1,14 @@
 #include "descriptor_set_layout.h"
 
-void DescriptorSetLayout::Destroy(Context const& context) const
+void vkc::DescriptorSetLayout::Destroy(Context const& context) const
 {
 	context.DispatchTable.destroyDescriptorSetLayout(m_Layout, nullptr);
 }
 
-DescriptorSetLayoutBuilder::DescriptorSetLayoutBuilder(Context& context)
+vkc::DescriptorSetLayoutBuilder::DescriptorSetLayoutBuilder(Context& context)
 	: m_Context{ context } {}
 
-DescriptorSetLayoutBuilder& DescriptorSetLayoutBuilder::AddBinding
+vkc::DescriptorSetLayoutBuilder& vkc::DescriptorSetLayoutBuilder::AddBinding
 (uint32_t binding, VkDescriptorType descriptorType, VkShaderStageFlags stageFlags, uint32_t count)
 {
 	VkDescriptorSetLayoutBinding bindingInfo{};
@@ -20,9 +20,9 @@ DescriptorSetLayoutBuilder& DescriptorSetLayoutBuilder::AddBinding
 	return *this;
 }
 
-DescriptorSetLayout DescriptorSetLayoutBuilder::Build(bool addToQueue)
+vkc::DescriptorSetLayout vkc::DescriptorSetLayoutBuilder::Build(bool addToQueue)
 {
-	DescriptorSetLayout             layout{};
+	DescriptorSetLayout        layout{};
 	VkDescriptorSetLayoutCreateInfo layoutInfo{};
 	layoutInfo.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	layoutInfo.bindingCount = static_cast<uint32_t>(m_Bindings.size());

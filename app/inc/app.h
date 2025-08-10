@@ -12,11 +12,15 @@
 #include "VkBootstrap.h"
 
 class Scene;
-class CommandPool;
-class CommandBuffer;
-class ImageView;
-class Image;
-class PipelineLayout;
+
+namespace vkc
+{
+	class CommandPool;
+	class CommandBuffer;
+	class ImageView;
+	class Image;
+	class PipelineLayout;
+}
 
 class App final
 {
@@ -49,38 +53,38 @@ private:
 	void CreateResources();
 	void CreateDepth();
 	void RecreateSwapchain();
-	void RecordCommandBuffer(CommandBuffer& commandBuffer, size_t imageIndex);
-	void Submit(CommandBuffer& commandBuffer) const;
+	void RecordCommandBuffer(vkc::CommandBuffer& commandBuffer, size_t imageIndex);
+	void Submit(vkc::CommandBuffer& commandBuffer) const;
 	void Present(uint32_t imageIndex);
 	void End();
 
 	uptr<Camera> m_Camera;
-	Context      m_Context{};
+	vkc::Context m_Context{};
 
 	uptr<Scene> m_Scene;
 
-	uptr<DescriptorSetLayout> m_FrameDescSetLayout{};
-	uptr<DescriptorSetLayout> m_GlobalDescSetLayout{};
-	uptr<DescriptorPool>      m_DescPool{};
+	uptr<vkc::DescriptorSetLayout> m_FrameDescSetLayout{};
+	uptr<vkc::DescriptorSetLayout> m_GlobalDescSetLayout{};
+	uptr<vkc::DescriptorPool>      m_DescPool{};
 
-	uptr<PipelineLayout> m_PipelineLayout;
-	uptr<Pipeline>       m_Pipeline{};
+	uptr<vkc::PipelineLayout> m_PipelineLayout;
+	uptr<vkc::Pipeline>       m_Pipeline{};
 
-	VkFormat        m_DepthFormat{};
-	uptr<Image>     m_DepthImage{};
-	uptr<ImageView> m_DepthImageView{};
+	VkFormat             m_DepthFormat{};
+	uptr<vkc::Image>     m_DepthImage{};
+	uptr<vkc::ImageView> m_DepthImageView{};
 
 	VkSampler m_TextureSampler{};
 
-	std::vector<Image>     m_SwapchainImages;
-	std::vector<ImageView> m_SwapchainImageViews;
+	std::vector<vkc::Image>     m_SwapchainImages;
+	std::vector<vkc::ImageView> m_SwapchainImageViews;
 
-	uptr<CommandPool> m_CommandPool{};
+	uptr<vkc::CommandPool> m_CommandPool{};
 
-	std::vector<Buffer> m_MVPUBOs{};
+	std::vector<vkc::Buffer> m_MVPUBOs{};
 
-	std::vector<DescriptorSet> m_FrameDescriptorSets{};
-	std::vector<DescriptorSet> m_GlobalDescriptorSets{};
+	std::vector<vkc::DescriptorSet> m_FrameDescriptorSets{};
+	std::vector<vkc::DescriptorSet> m_GlobalDescriptorSets{};
 
 	std::vector<VkSemaphore> m_ImageAvailableSemaphores{};
 	std::vector<VkSemaphore> m_RenderFinishedSemaphores{};
