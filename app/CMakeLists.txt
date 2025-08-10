@@ -32,7 +32,10 @@ FetchContent_MakeAvailable(VulkanClasses)
 set(SHADER_SOURCES
     "basic_color.frag"
     "basic_transform.vert"
-    "alpha_discard.frag")
+    "alpha_discard.frag"
+    "gbuffer_generation.frag"
+    "lighting.frag"
+    "quad.vert")
 
 set(HEADER
     inc/helper.h

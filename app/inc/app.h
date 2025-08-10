@@ -51,6 +51,7 @@ private:
 	void CreateCmdPool();
 	void CreateDescriptorSetLayouts();
 	void CreateResources();
+	void CreateGBuffer();
 	void CreateDepth();
 	void RecreateSwapchain();
 	void RecordCommandBuffer(vkc::CommandBuffer& commandBuffer, size_t imageIndex);
@@ -58,7 +59,8 @@ private:
 	void Present(uint32_t imageIndex);
 	void End();
 
-	void DoMainPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex);
+	void DoLightingPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex);
+	void DoGBufferPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex);
 	void DoDepthPrepass(vkc::CommandBuffer const& commandBuffer, size_t imageIndex) const;
 
 	uptr<Camera> m_Camera;
@@ -73,12 +75,21 @@ private:
 	uptr<vkc::PipelineLayout> m_DepthPrepPipelineLayout;
 	uptr<vkc::Pipeline>       m_DepthPrepPipeline{};
 
-	uptr<vkc::PipelineLayout> m_PipelineLayout;
-	uptr<vkc::Pipeline>       m_Pipeline{};
+	uptr<vkc::PipelineLayout> m_GBufferGenPipelineLayout;
+	uptr<vkc::Pipeline>       m_GBufferGenPipeline{};
+
+	uptr<vkc::PipelineLayout> m_LightingPipelineLayout;
+	uptr<vkc::Pipeline>       m_LightingPipeline{};
 
 	VkFormat             m_DepthFormat{};
 	uptr<vkc::Image>     m_DepthImage{};
 	uptr<vkc::ImageView> m_DepthImageView{};
+
+	uptr<vkc::Image>     m_AlbedoImage{};
+	uptr<vkc::ImageView> m_AlbedoView{};
+
+	uptr<vkc::Image>     m_NormalXMaterialImage{};
+	uptr<vkc::ImageView> m_NormalXMaterialView{};
 
 	VkSampler m_TextureSampler{};
 
