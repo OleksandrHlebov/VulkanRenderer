@@ -1,7 +1,7 @@
 #include "app.h"
 
 #include "command_pool.h"
-#include "../inc/datatypes.h"
+#include "datatypes.h"
 #include "helper.h"
 #include "image.h"
 #include "shader_stage.h"

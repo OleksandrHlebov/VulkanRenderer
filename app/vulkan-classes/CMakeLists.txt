@@ -29,7 +29,7 @@ FetchContent_MakeAvailable(vma)
 set(INCLUDE
     inc/vma_usage.h
     inc/deletion_queue.h
-    inc/Buffer.h
+    inc/buffer.h
     inc/image.h
     inc/image_view.h
     inc/pipeline_layout.h
@@ -66,8 +66,8 @@ else ()
 endif ()
 
 target_include_directories(${PROJECT_NAME} PUBLIC
-                           ${CMAKE_CURRENT_SOURCE_DIR}/inc
-                           ${CMAKE_CURRENT_SOURCE_DIR}/src)
+                           inc
+                           src)
 
 target_link_libraries(${PROJECT_NAME} PUBLIC
                       Vulkan::Vulkan

@@ -37,7 +37,6 @@ add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/W4>
                     $<$<CXX_COMPILER_ID:Clang>:-Wextra>
                     $<$<CXX_COMPILER_ID:Clang>:-Werror>)
 
-add_subdirectory(vulkan-classes)
 add_subdirectory(app)
 
 set(SOURCE

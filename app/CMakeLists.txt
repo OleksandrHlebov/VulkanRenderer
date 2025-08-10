@@ -42,15 +42,11 @@ set(SOURCE
     src/scene.cpp
     src/mesh.cpp)
 
+add_subdirectory(vulkan-classes)
+
 add_library(App STATIC
             ${SOURCE}
             ${HEADER})
-target_include_directories(${PROJECT_NAME} PRIVATE
-                           ${CMAKE_CURRENT_SOURCE_DIR}/inc
-                           ${CMAKE_CURRENT_SOURCE_DIR}/src
-                           ${stb_SOURCE_DIR})
-target_include_directories(${PROJECT_NAME} PUBLIC
-                           ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
                            GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -61,6 +57,13 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
                       VulkanClasses
                       glm::glm
                       assimp::assimp)
+
+target_include_directories(${PROJECT_NAME} PRIVATE
+                           ${CMAKE_CURRENT_SOURCE_DIR}/inc
+                           ${CMAKE_CURRENT_SOURCE_DIR}/src
+                           ${stb_SOURCE_DIR})
+target_include_directories(${PROJECT_NAME} PUBLIC
+                           ${CMAKE_CURRENT_SOURCE_DIR})
 
 foreach (shader IN LISTS SHADER_SOURCES)
 	Shader_Compile(${shader})
