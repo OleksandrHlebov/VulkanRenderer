@@ -4,6 +4,7 @@ project(VulkanClasses)
 set(CMAKE_CXX_STANDARD 20)
 
 find_package(Vulkan REQUIRED)
+include(FetchContent)
 
 set(EXTERNAL_LIBS)
 
