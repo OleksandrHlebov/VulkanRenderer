@@ -59,6 +59,7 @@ private:
 	void End();
 
 	void DoMainPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex);
+	void DoDepthPrepass(vkc::CommandBuffer const& commandBuffer, size_t imageIndex) const;
 
 	uptr<Camera> m_Camera;
 	vkc::Context m_Context{};
@@ -68,6 +69,9 @@ private:
 	uptr<vkc::DescriptorSetLayout> m_FrameDescSetLayout{};
 	uptr<vkc::DescriptorSetLayout> m_GlobalDescSetLayout{};
 	uptr<vkc::DescriptorPool>      m_DescPool{};
+
+	uptr<vkc::PipelineLayout> m_DepthPrepPipelineLayout;
+	uptr<vkc::Pipeline>       m_DepthPrepPipeline{};
 
 	uptr<vkc::PipelineLayout> m_PipelineLayout;
 	uptr<vkc::Pipeline>       m_Pipeline{};
