@@ -35,12 +35,10 @@ App::App(int width, int height)
 		vkb::destroy_swapchain(m_Context.Swapchain);
 	});
 	CreateCmdPool();
-	// TODO: Load scene
 	m_Scene = std::make_unique<Scene>(m_Context, *m_CommandPool);
 	m_Scene->LoadScene("data/glTF/Sponza.gltf");
 	std::cout << (m_Scene->ContainsPBRInfo() ? "scene contains pbr info" : "scene does not contain pbr info") << std::endl;
 	// CreateVertexBuffer();
-	// TODO: Create resources (depth/textures)
 	CreateResources();
 	CreateDescriptorSetLayouts();
 	CreateGraphicsPipeline();
@@ -342,7 +340,7 @@ void App::CreateDescriptorSets()
 			VkDescriptorImageInfo normalsInfo{};
 			normalsInfo.sampler     = VK_NULL_HANDLE;
 			normalsInfo.imageLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
-			normalsInfo.imageView   = *m_NormalXMaterialView;
+			normalsInfo.imageView   = *m_MaterialView;
 
 			m_FrameDescriptorSets[index]
 				.AddWriteDescriptor({ &bufferInfo, 1 }, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, 0)
@@ -423,10 +421,16 @@ void App::CreateGraphicsPipeline()
 		m_LightingPipelineLayout = std::make_unique<vkc::PipelineLayout>(std::move(layout));
 	}
 
-	vkc::ShaderStage const vert{ m_Context, help::ReadFile("shaders/basic_transform.spv"), VK_SHADER_STAGE_VERTEX_BIT };
+	VkPipelineColorBlendAttachmentState blendAttachment{};
+	blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT
+									 | VK_COLOR_COMPONENT_G_BIT
+									 | VK_COLOR_COMPONENT_B_BIT
+									 | VK_COLOR_COMPONENT_A_BIT;
+
 	// depth prepass pipeline
 	{
-		vkc::ShaderStage alphaDiscard{ m_Context, help::ReadFile("shaders/alpha_discard.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
+		vkc::ShaderStage const vert{ m_Context, help::ReadFile("shaders/basic_transform.spv"), VK_SHADER_STAGE_VERTEX_BIT };
+		vkc::ShaderStage       alphaDiscard{ m_Context, help::ReadFile("shaders/alpha_discard.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
 		alphaDiscard.AddSpecializationConstant(static_cast<uint32_t>(m_Scene->GetTextureImages().size()));
 
 		vkc::PipelineBuilder builder{ m_Context };
@@ -449,10 +453,11 @@ void App::CreateGraphicsPipeline()
 	}
 	// gbuffer gen pipeline
 	{
-		vkc::ShaderStage frag{ m_Context, help::ReadFile("shaders/gbuffer_generation.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
+		vkc::ShaderStage const vert{ m_Context, help::ReadFile("shaders/transform_w_normals.spv"), VK_SHADER_STAGE_VERTEX_BIT };
+		vkc::ShaderStage       frag{ m_Context, help::ReadFile("shaders/gbuffer_generation.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
 		frag.AddSpecializationConstant(static_cast<uint32_t>(m_Scene->GetTextureImages().size()));
 
-		VkFormat colorAttachmentFormats[]{ m_AlbedoImage->GetFormat() };
+		VkFormat colorAttachmentFormats[]{ m_AlbedoImage->GetFormat(), m_MaterialImage->GetFormat() };
 
 		vkc::PipelineBuilder builder{ m_Context };
 		vkc::Pipeline        pipeline = builder
@@ -464,6 +469,8 @@ void App::CreateGraphicsPipeline()
 								 .SetVertexDescription(Vertex::GetBindingDescription(), Vertex::GetAttributeDescription())
 								 .AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT)
 								 .AddDynamicState(VK_DYNAMIC_STATE_SCISSOR)
+								 .AddColorBlendAttachment(blendAttachment)
+								 .AddColorBlendAttachment(blendAttachment)
 								 .SetRenderingAttachments(colorAttachmentFormats, m_DepthFormat, VK_FORMAT_UNDEFINED)
 								 .EnableDepthTest(VK_COMPARE_OP_EQUAL)
 								 .AddShaderStage(vert)
@@ -487,6 +494,7 @@ void App::CreateGraphicsPipeline()
 								 .SetFrontFace(VK_FRONT_FACE_COUNTER_CLOCKWISE)
 								 .AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT)
 								 .AddDynamicState(VK_DYNAMIC_STATE_SCISSOR)
+								 .AddColorBlendAttachment(blendAttachment)
 								 .SetRenderingAttachments(colorAttachmentFormats, m_DepthFormat, VK_FORMAT_UNDEFINED)
 								 .AddShaderStage(quad)
 								 .AddShaderStage(lighting)
@@ -521,8 +529,8 @@ void App::CreateResources()
 		m_DepthImageView->Destroy(m_Context);
 		m_AlbedoImage->Destroy(m_Context);
 		m_AlbedoView->Destroy(m_Context);
-		m_NormalXMaterialImage->Destroy(m_Context);
-		m_NormalXMaterialView->Destroy(m_Context);
+		m_MaterialImage->Destroy(m_Context);
+		m_MaterialView->Destroy(m_Context);
 	});
 }
 
@@ -542,13 +550,13 @@ void App::CreateGBuffer()
 
 	image = builder
 			.SetExtent(m_Context.Swapchain.extent)
-			.SetFormat(VK_FORMAT_R8G8B8A8_UNORM).SetType(VK_IMAGE_TYPE_2D)
+			.SetFormat(VK_FORMAT_R16G16B16A16_UNORM).SetType(VK_IMAGE_TYPE_2D)
 			.SetAspectFlags(VK_IMAGE_ASPECT_COLOR_BIT)
 			.Build(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, false);
 	view = image.CreateView(m_Context, VK_IMAGE_VIEW_TYPE_2D, 0, 1, 0, 1, false);
 
-	m_NormalXMaterialImage = std::make_unique<vkc::Image>(std::move(image));
-	m_NormalXMaterialView  = std::make_unique<vkc::ImageView>(std::move(view));
+	m_MaterialImage = std::make_unique<vkc::Image>(std::move(image));
+	m_MaterialView  = std::make_unique<vkc::ImageView>(std::move(view));
 }
 
 void App::CreateDepth()
@@ -583,8 +591,8 @@ void App::RecreateSwapchain()
 	m_DepthImageView->Destroy(m_Context);
 	m_AlbedoImage->Destroy(m_Context);
 	m_AlbedoView->Destroy(m_Context);
-	m_NormalXMaterialImage->Destroy(m_Context);
-	m_NormalXMaterialView->Destroy(m_Context);
+	m_MaterialImage->Destroy(m_Context);
+	m_MaterialView->Destroy(m_Context);
 
 	CreateSwapchain();
 	CreateDepth();
@@ -676,7 +684,7 @@ void App::DoLightingPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
 			transition.NewLayout     = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
 		}
 		m_AlbedoImage->MakeTransition(m_Context, commandBuffer, transition);
-		m_NormalXMaterialImage->MakeTransition(m_Context, commandBuffer, transition);
+		m_MaterialImage->MakeTransition(m_Context, commandBuffer, transition);
 	}
 
 	VkRenderingAttachmentInfo renderingAttachmentInfo{};
@@ -791,7 +799,7 @@ void App::DoGBufferPass(vkc::CommandBuffer& commandBuffer, size_t) const
 			transition.NewLayout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		}
 		m_AlbedoImage->MakeTransition(m_Context, commandBuffer, transition);
-		m_NormalXMaterialImage->MakeTransition(m_Context, commandBuffer, transition);
+		m_MaterialImage->MakeTransition(m_Context, commandBuffer, transition);
 	}
 
 	VkRenderingAttachmentInfo const renderingAttachmentInfo[]
@@ -801,6 +809,18 @@ void App::DoGBufferPass(vkc::CommandBuffer& commandBuffer, size_t) const
 			, .pNext = nullptr
 			, .imageView = *m_AlbedoView
 			, .imageLayout = m_AlbedoImage->GetLayout()
+			, .resolveMode = VK_RESOLVE_MODE_NONE
+			, .resolveImageView = VK_NULL_HANDLE
+			, .resolveImageLayout = VK_IMAGE_LAYOUT_UNDEFINED
+			, .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR
+			, .storeOp = VK_ATTACHMENT_STORE_OP_STORE
+			, .clearValue = { { .0f, .0f, .0f, 1.f } }
+		}
+		, {
+			.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO
+			, .pNext = nullptr
+			, .imageView = *m_MaterialView
+			, .imageLayout = m_MaterialImage->GetLayout()
 			, .resolveMode = VK_RESOLVE_MODE_NONE
 			, .resolveImageView = VK_NULL_HANDLE
 			, .resolveImageLayout = VK_IMAGE_LAYOUT_UNDEFINED
@@ -971,7 +991,7 @@ void App::DoDepthPrepass(vkc::CommandBuffer const& commandBuffer, size_t) const
 													 , *m_DepthPrepPipelineLayout
 													 , VK_SHADER_STAGE_FRAGMENT_BIT
 													 , 0
-													 , sizeof(TextureIndices)
+													 , sizeof(TextureIndices::Diffuse)
 													 , &mesh.GetTextureIndices().Diffuse);
 
 			m_Context.DispatchTable.cmdDrawIndexed(commandBuffer

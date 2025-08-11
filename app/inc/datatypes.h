@@ -15,12 +15,19 @@ struct ModelViewProj
 struct TextureIndices
 {
 	uint32_t Diffuse;
+	uint32_t Normals;
+	uint32_t Metalness;
+	uint32_t Roughness;
 };
 
 struct Vertex
 {
 	glm::vec3 Position;
 	glm::vec2 UV;
+
+	glm::vec3 Normal;
+	glm::vec3 Tangent;
+	glm::vec3 Bitangent;
 
 	static std::span<VkVertexInputBindingDescription> GetBindingDescription()
 	{
@@ -51,6 +58,24 @@ struct Vertex
 				, .binding = 0
 				, .format = VK_FORMAT_R32G32_SFLOAT
 				, .offset = offsetof(Vertex, UV)
+			}
+			, {
+				.location = 2
+				, .binding = 0
+				, .format = VK_FORMAT_R32G32B32_SFLOAT
+				, .offset = offsetof(Vertex, Normal)
+			}
+			, {
+				.location = 3
+				, .binding = 0
+				, .format = VK_FORMAT_R32G32B32_SFLOAT
+				, .offset = offsetof(Vertex, Tangent)
+			}
+			, {
+				.location = 4
+				, .binding = 0
+				, .format = VK_FORMAT_R32G32B32_SFLOAT
+				, .offset = offsetof(Vertex, Bitangent)
 			}
 		};
 

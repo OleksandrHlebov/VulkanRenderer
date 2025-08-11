@@ -88,8 +88,8 @@ private:
 	uptr<vkc::Image>     m_AlbedoImage{};
 	uptr<vkc::ImageView> m_AlbedoView{};
 
-	uptr<vkc::Image>     m_NormalXMaterialImage{};
-	uptr<vkc::ImageView> m_NormalXMaterialView{};
+	uptr<vkc::Image>     m_MaterialImage{};
+	uptr<vkc::ImageView> m_MaterialView{};
 
 	VkSampler m_TextureSampler{};
 

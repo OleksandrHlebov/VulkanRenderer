@@ -68,15 +68,27 @@ void Scene::ProcessNode(aiNode const* node, aiScene const* scene, vkc::CommandBu
 		std::vector<Vertex>   tempVertices;
 		std::vector<uint32_t> tempIndices;
 		aiMatrix4x4           transform = scene->mRootNode->mTransformation;
+
+		aiVector3D   translation{};
+		aiQuaternion rotationQuat{};
+
+		transform.DecomposeNoScaling(rotationQuat, translation);
+
+		aiMatrix3x3 const rotation{ rotationQuat.GetMatrix() };
+
 		for (uint32_t vertexIndex{}; vertexIndex < mesh->mNumVertices; vertexIndex++)
 		{
-			aiVector3D const aiPosition = transform * mesh->mVertices[vertexIndex];
+			aiVector3D const aiPosition  = transform * mesh->mVertices[vertexIndex];
+			aiVector3D const aiNormal    = rotation * mesh->mNormals[vertexIndex];
+			aiVector3D const aiTangent   = rotation * mesh->mTangents[vertexIndex];
+			aiVector3D const aiBitangent = rotation * mesh->mBitangents[vertexIndex];
 
 			Vertex tempVertex{};
-			tempVertex.Position = glm::vec3(aiPosition.x, aiPosition.y, aiPosition.z);
-			tempVertex.UV       = glm::vec2(mesh->mTextureCoords[0][vertexIndex].x, mesh->mTextureCoords[0][vertexIndex].y);
-
-			// TODO: normals, tangent, bitangent
+			tempVertex.Position  = glm::vec3(aiPosition.x, aiPosition.y, aiPosition.z);
+			tempVertex.UV        = glm::vec2(mesh->mTextureCoords[0][vertexIndex].x, mesh->mTextureCoords[0][vertexIndex].y);
+			tempVertex.Normal    = glm::vec3(aiNormal.x, aiNormal.y, aiNormal.z);
+			tempVertex.Tangent   = glm::vec3(aiTangent.x, aiTangent.y, aiTangent.z);
+			tempVertex.Bitangent = glm::vec3(aiBitangent.x, aiBitangent.y, aiBitangent.z);
 
 			m_AABBMin.x = std::min(m_AABBMin.x, tempVertex.Position.x);
 			m_AABBMin.y = std::min(m_AABBMin.y, tempVertex.Position.y);
@@ -94,9 +106,13 @@ void Scene::ProcessNode(aiNode const* node, aiScene const* scene, vkc::CommandBu
 			for (uint32_t index{}; index < face.mNumIndices; index++)
 				tempIndices.push_back(face.mIndices[index]);
 		}
-		// TODO: materials
+
 		TextureIndices textureIndices{};
 		textureIndices.Diffuse   = LoadTexture(aiTextureType_DIFFUSE, scene->mMaterials[mesh->mMaterialIndex], commandBuffer);
+		textureIndices.Normals   = LoadTexture(aiTextureType_NORMALS, scene->mMaterials[mesh->mMaterialIndex], commandBuffer);
+		textureIndices.Metalness = LoadTexture(aiTextureType_METALNESS, scene->mMaterials[mesh->mMaterialIndex], commandBuffer);
+		textureIndices.Roughness = LoadTexture(aiTextureType_DIFFUSE_ROUGHNESS, scene->mMaterials[mesh->mMaterialIndex], commandBuffer);
+
 		vkc::Buffer& stagingVert = m_StagingBuffers.emplace(vkc::BufferBuilder{ m_Context }
 															.MapMemory()
 															.SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
@@ -133,7 +149,7 @@ uint32_t Scene::LoadTexture(aiTextureType type, aiMaterial const* material, vkc:
 	if (material->GetTextureCount(type))
 		material->GetTexture(type, 0, &str);
 	else
-		str = aiString{ "data/textures/200px-Debugempty.png" };
+		str = aiString{ "200px-Debugempty.png" };
 
 	if (!m_LoadedTextures.contains(str.C_Str()))
 	{
