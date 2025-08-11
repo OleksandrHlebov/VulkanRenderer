@@ -757,7 +757,7 @@ void App::DoLightingPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
 	m_Context.DispatchTable.cmdEndDebugUtilsLabelEXT(commandBuffer);
 }
 
-void App::DoGBufferPass(vkc::CommandBuffer& commandBuffer, size_t)
+void App::DoGBufferPass(vkc::CommandBuffer& commandBuffer, size_t) const
 {
 	VkDebugUtilsLabelEXT debugLabel{};
 	debugLabel.sType      = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
@@ -798,8 +798,12 @@ void App::DoGBufferPass(vkc::CommandBuffer& commandBuffer, size_t)
 	{
 		{
 			.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO
+			, .pNext = nullptr
 			, .imageView = *m_AlbedoView
 			, .imageLayout = m_AlbedoImage->GetLayout()
+			, .resolveMode = VK_RESOLVE_MODE_NONE
+			, .resolveImageView = VK_NULL_HANDLE
+			, .resolveImageLayout = VK_IMAGE_LAYOUT_UNDEFINED
 			, .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR
 			, .storeOp = VK_ATTACHMENT_STORE_OP_STORE
 			, .clearValue = { { .0f, .0f, .0f, 1.f } }

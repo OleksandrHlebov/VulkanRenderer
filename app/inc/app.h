@@ -60,7 +60,7 @@ private:
 	void End();
 
 	void DoLightingPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex);
-	void DoGBufferPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex);
+	void DoGBufferPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex) const;
 	void DoDepthPrepass(vkc::CommandBuffer const& commandBuffer, size_t imageIndex) const;
 
 	uptr<Camera> m_Camera;

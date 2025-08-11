@@ -15,6 +15,7 @@ list(APPEND EXTERNAL_LIBS glm)
 FetchContent_Declare(
 		assimp
 		URL https://github.com/assimp/assimp/archive/refs/tags/v6.0.2.tar.gz)
+set(ASSIMP_INJECT_DEBUG_POSTFIX OFF)
 set(ASSIMP_BUILD_TESTS OFF)
 set(ASSIMP_BUILD_ASSIMP_VIEW OFF)
 FetchContent_MakeAvailable(assimp)
@@ -38,7 +39,6 @@ add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/W4>
                     $<$<CXX_COMPILER_ID:Clang>:-Werror>)
 
 add_subdirectory(app)
-
 set(SOURCE
     main.cpp)
 
@@ -46,13 +46,21 @@ add_executable(${PROJECT_NAME}
                ${SOURCE})
 
 target_link_libraries(${PROJECT_NAME} PRIVATE App)
-
-set(ASSIMP_DLL "${assimp_BINARY_DIR}/bin/assimp-vc143-mtd.dll")
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-                   COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                   "${ASSIMP_DLL}"
-                   "${CMAKE_BINARY_DIR}/"
-                   )
+#if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+#	#	set(ASSIMP_DLL "${assimp_BINARY_DIR}/bin/assimp-vc143-mt.dll")
+#	#	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+#	#	                   COMMAND ${CMAKE_COMMAND} -E copy_if_different
+#	#	                   "${ASSIMP_DLL}"
+#	#	                   "${CMAKE_BINARY_DIR}/"
+#	#	                   )
+#	#elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+#	#	set(ASSIMP_DLL "${assimp_BINARY_DIR}/bin/libassimp-6.dll")
+#	#	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+#	#	                   COMMAND ${CMAKE_COMMAND} -E copy_if_different
+#	#	                   "${ASSIMP_DLL}"
+#	#	                   "${CMAKE_BINARY_DIR}/"
+#	#	                   )
+#endif ()
 
 foreach (target IN LISTS EXTERNAL_LIBS)
 	target_compile_options(${target} PRIVATE
