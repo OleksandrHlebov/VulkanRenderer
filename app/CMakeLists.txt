@@ -22,6 +22,13 @@ macro(Shader_Compile name)
 	                   COMMENT "Compiled ${SHADER_SPIRV_PATH}")
 	list(APPEND COMPILED_SHADERS ${SHADER_SPIRV_PATH})
 endmacro()
+
+FetchContent_Declare(
+		VulkanClasses
+		GIT_REPOSITORY https://github.com/OleksandrHlebov/vulkan-classes.git
+		GIT_TAG master)
+FetchContent_MakeAvailable(VulkanClasses)
+
 set(SHADER_SOURCES
     "basic_color.frag"
     "basic_transform.vert")
@@ -29,7 +36,8 @@ set(SHADER_SOURCES
 set(HEADER
     inc/helper.h
     inc/camera.h
-    inc/world_time.h)
+    inc/world_time.h
+    inc/datatypes.h)
 
 set(SOURCE
     src/app.cpp
@@ -53,7 +61,8 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 
 target_link_libraries(${PROJECT_NAME} PUBLIC
                       VulkanClasses
-                      glm::glm)
+                      glm::glm
+                      assimp::assimp)
 
 foreach (shader IN LISTS SHADER_SOURCES)
 	Shader_Compile(${shader})

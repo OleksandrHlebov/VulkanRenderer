@@ -75,7 +75,7 @@ void App::Run()
 			return;
 		}
 
-		CommandBuffer& commandBuffer = m_CommandPool->AllocateCommandBuffer(m_Context);
+		vkc::CommandBuffer& commandBuffer = m_CommandPool->AllocateCommandBuffer(m_Context);
 		m_Context.DispatchTable.resetFences(1, &m_InFlightFences[m_CurrentFrame]);
 
 		RecordCommandBuffer(commandBuffer, imageIndex);
@@ -224,8 +224,8 @@ void App::CreateSwapchain()
 	vkb::destroy_swapchain(m_Context.Swapchain);
 	m_Context.Swapchain = swapchainResult.value();
 
-	Image::ConvertFromSwapchainVkImages(m_Context, m_SwapchainImages);
-	ImageView::ConvertFromSwapchainVkImageViews(m_Context, m_SwapchainImageViews);
+	vkc::Image::ConvertFromSwapchainVkImages(m_Context, m_SwapchainImages);
+	vkc::ImageView::ConvertFromSwapchainVkImageViews(m_Context, m_SwapchainImageViews);
 
 	m_FramesInFlight = m_Context.Swapchain.image_count;
 }
@@ -261,19 +261,19 @@ void App::CreateSyncObjects()
 
 void App::CreateDescriptorPool()
 {
-	DescriptorPoolBuilder builder{ m_Context };
-	DescriptorPool        pool = builder
-						  .AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, m_FramesInFlight)
-						  .Build(m_FramesInFlight);
+	vkc::DescriptorPoolBuilder builder{ m_Context };
+	vkc::DescriptorPool        pool = builder
+							   .AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, m_FramesInFlight)
+							   .Build(m_FramesInFlight);
 
-	m_DescPool = std::make_unique<DescriptorPool>(std::move(pool));
+	m_DescPool = std::make_unique<vkc::DescriptorPool>(std::move(pool));
 }
 
 void App::CreateDescriptorSets()
 {
 	std::vector<VkDescriptorSetLayout> layouts(m_FramesInFlight, *m_FrameDescSetLayout);
 
-	DescriptorSetBuilder const builder{ m_Context };
+	vkc::DescriptorSetBuilder const builder{ m_Context };
 	m_FrameDescriptorSets = builder.Build(*m_DescPool, layouts);
 
 	for (uint32_t index{}; index < m_FramesInFlight; ++index)
@@ -299,18 +299,18 @@ void App::CreateVertexBuffer()
 		, { glm::vec3{ .5f, -.5f, 1.f } }
 	};
 
-	BufferBuilder stagingBufferBuilder{ m_Context };
-	Buffer        stagingBuffer = stagingBufferBuilder
-						   .SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
-						   .MapMemory()
-						   .Build(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, sizeof(vertices));
+	vkc::BufferBuilder stagingBufferBuilder{ m_Context };
+	vkc::Buffer        stagingBuffer = stagingBufferBuilder
+								.SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+								.MapMemory()
+								.Build(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, sizeof(vertices));
 	stagingBuffer.UpdateData(vertices);
-	BufferBuilder bufferBuilder{ m_Context };
-	Buffer        buffer = bufferBuilder
-					.SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
-					.Build(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, sizeof(vertices));
+	vkc::BufferBuilder bufferBuilder{ m_Context };
+	vkc::Buffer        buffer = bufferBuilder
+						 .SetRequiredMemoryFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+						 .Build(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, sizeof(vertices));
 
-	CommandBuffer& commandBuffer = m_CommandPool->AllocateCommandBuffer(m_Context);
+	vkc::CommandBuffer& commandBuffer = m_CommandPool->AllocateCommandBuffer(m_Context);
 	commandBuffer.Begin(m_Context);
 	stagingBuffer.CopyTo(m_Context, commandBuffer, buffer);
 	commandBuffer.End(m_Context);
@@ -320,67 +320,72 @@ void App::CreateVertexBuffer()
 		result != VK_SUCCESS)
 		throw std::runtime_error("Failed to wait for the fences");
 
-	m_VertexBuffer = std::make_unique<Buffer>(std::move(buffer));
+	m_VertexBuffer = std::make_unique<vkc::Buffer>(std::move(buffer));
 }
 
 void App::CreateGraphicsPipeline()
 {
 	// default layout
 	{
-		PipelineLayoutBuilder builder{ m_Context };
-		PipelineLayout        layout = builder
-								.AddDescriptorSetLayout(*m_FrameDescSetLayout)
-								.Build();
-		m_PipelineLayout = std::make_unique<PipelineLayout>(std::move(layout));
+		vkc::PipelineLayoutBuilder builder{ m_Context };
+		vkc::PipelineLayout        layout = builder
+									 .AddDescriptorSetLayout(*m_FrameDescSetLayout)
+									 .Build();
+		m_PipelineLayout = std::make_unique<vkc::PipelineLayout>(std::move(layout));
 	}
 
-	ShaderStage const vert{ m_Context, help::ReadFile("shaders/basic_transform.spv"), VK_SHADER_STAGE_VERTEX_BIT };
-	ShaderStage const frag{ m_Context, help::ReadFile("shaders/basic_color.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
+	vkc::ShaderStage const vert{ m_Context, help::ReadFile("shaders/basic_transform.spv"), VK_SHADER_STAGE_VERTEX_BIT };
+	vkc::ShaderStage const frag{ m_Context, help::ReadFile("shaders/basic_color.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
 
 	VkFormat colorAttachmentFormats[]{ m_Context.Swapchain.image_format };
 
-	PipelineBuilder builder{ m_Context };
-	Pipeline        pipeline = builder
-						.SetTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
-						.AddViewport(m_Context.Swapchain.extent)
-						.SetPolygonMode(VK_POLYGON_MODE_FILL)
-						.SetCullMode(VK_CULL_MODE_BACK_BIT)
-						.SetFrontFace(VK_FRONT_FACE_CLOCKWISE)
-						.SetVertexDescription(Vertex::GetBindingDescription(), Vertex::GetAttributeDescription())
-						.AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT)
-						.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR)
-						.SetRenderingAttachments(colorAttachmentFormats, m_DepthFormat, VK_FORMAT_UNDEFINED)
-						.EnableDepthTest(VK_COMPARE_OP_LESS_OR_EQUAL)
-						.EnableDepthWrite()
-						.AddShaderStage(vert)
-						.AddShaderStage(frag)
-						.Build(*m_PipelineLayout, true);
-	m_Pipeline = std::make_unique<Pipeline>(std::move(pipeline));
+	VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
+										  VK_COLOR_COMPONENT_A_BIT;
+
+	vkc::PipelineBuilder builder{ m_Context };
+	vkc::Pipeline        pipeline = builder
+							 .SetTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+							 .AddViewport(m_Context.Swapchain.extent)
+							 .SetPolygonMode(VK_POLYGON_MODE_FILL)
+							 .SetCullMode(VK_CULL_MODE_BACK_BIT)
+							 .SetFrontFace(VK_FRONT_FACE_CLOCKWISE)
+							 .SetVertexDescription(Vertex::GetBindingDescription(), Vertex::GetAttributeDescription())
+							 .AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT)
+							 .AddDynamicState(VK_DYNAMIC_STATE_SCISSOR)
+							 .AddColorBlendAttachment(colorBlendAttachment)
+							 .SetRenderingAttachments(colorAttachmentFormats, m_DepthFormat, VK_FORMAT_UNDEFINED)
+							 .EnableDepthTest(VK_COMPARE_OP_LESS_OR_EQUAL)
+							 .EnableDepthWrite()
+							 .AddShaderStage(vert)
+							 .AddShaderStage(frag)
+							 .Build(*m_PipelineLayout, true);
+	m_Pipeline = std::make_unique<vkc::Pipeline>(std::move(pipeline));
 }
 
 void App::CreateCmdPool()
 {
-	m_CommandPool = std::make_unique<CommandPool>(m_Context
-												  , m_Context.Device.get_queue_index(vkb::QueueType::graphics).value()
-												  , m_FramesInFlight
-												  , VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+	m_CommandPool = std::make_unique<vkc::CommandPool>(m_Context
+													   , m_Context.Device.get_queue_index(vkb::QueueType::graphics).value()
+													   , m_FramesInFlight
+													   , VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 }
 
 void App::CreateDescriptorSetLayouts()
 {
-	DescriptorSetLayoutBuilder builder{ m_Context };
-	DescriptorSetLayout        layout = builder
-								 .AddBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
-								 .Build();
+	vkc::DescriptorSetLayoutBuilder builder{ m_Context };
+	vkc::DescriptorSetLayout        layout = builder
+									  .AddBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
+									  .Build();
 
-	m_FrameDescSetLayout = std::make_unique<DescriptorSetLayout>(std::move(layout));
+	m_FrameDescSetLayout = std::make_unique<vkc::DescriptorSetLayout>(std::move(layout));
 }
 
 void App::CreateResources()
 {
 	// mvp ubo
 	{
-		BufferBuilder builder{ m_Context };
+		vkc::BufferBuilder builder{ m_Context };
 		builder.MapMemory().SetMemoryUsage(VMA_MEMORY_USAGE_CPU_TO_GPU);
 
 		for (uint32_t index{}; index < m_FramesInFlight; ++index)
@@ -391,18 +396,18 @@ void App::CreateResources()
 
 void App::CreateDepth()
 {
-	ImageBuilder builder{ m_Context };
-	Image        image = builder
-				  .SetExtent(m_Context.Swapchain.extent)
-				  .SetFormat(m_DepthFormat)
-				  .SetType(VK_IMAGE_TYPE_2D)
-				  .SetAspectFlags(VK_IMAGE_ASPECT_DEPTH_BIT | help::HasStencilComponent(m_DepthFormat) *
-								  VK_IMAGE_ASPECT_STENCIL_BIT)
-				  .Build(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, false);
-	m_DepthImage = std::make_unique<Image>(std::move(image));
+	vkc::ImageBuilder builder{ m_Context };
+	vkc::Image        image = builder
+					   .SetExtent(m_Context.Swapchain.extent)
+					   .SetFormat(m_DepthFormat)
+					   .SetType(VK_IMAGE_TYPE_2D)
+					   .SetAspectFlags(VK_IMAGE_ASPECT_DEPTH_BIT | help::HasStencilComponent(m_DepthFormat) *
+									   VK_IMAGE_ASPECT_STENCIL_BIT)
+					   .Build(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, false);
+	m_DepthImage = std::make_unique<vkc::Image>(std::move(image));
 
-	ImageView imageView = m_DepthImage->CreateView(m_Context, VK_IMAGE_VIEW_TYPE_2D, 0, 1, 0, 1, false);
-	m_DepthImageView    = std::make_unique<ImageView>(std::move(imageView));
+	vkc::ImageView imageView = m_DepthImage->CreateView(m_Context, VK_IMAGE_VIEW_TYPE_2D, 0, 1, 0, 1, false);
+	m_DepthImageView         = std::make_unique<vkc::ImageView>(std::move(imageView));
 }
 
 void App::RecreateSwapchain()
@@ -426,13 +431,13 @@ void App::RecreateSwapchain()
 								/ m_Context.Swapchain.extent.height); // NOLINT(*-narrowing-conversions)
 }
 
-void App::RecordCommandBuffer(CommandBuffer& commandBuffer, size_t imageIndex)
+void App::RecordCommandBuffer(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
 {
 	commandBuffer.Begin(m_Context);
-	Image& swapchainImage = m_SwapchainImages[imageIndex];
+	vkc::Image& swapchainImage = m_SwapchainImages[imageIndex];
 	// swapchain image to attachment optimal
 	{
-		Image::Transition transition{};
+		vkc::Image::Transition transition{};
 		//
 		{
 			transition.SrcAccessMask = VK_ACCESS_2_NONE;
@@ -445,7 +450,7 @@ void App::RecordCommandBuffer(CommandBuffer& commandBuffer, size_t imageIndex)
 	}
 	// depth image to attachment optimal
 	{
-		Image::Transition transition{};
+		vkc::Image::Transition transition{};
 		//
 		{
 			transition.SrcAccessMask = VK_ACCESS_2_NONE;
@@ -521,7 +526,7 @@ void App::RecordCommandBuffer(CommandBuffer& commandBuffer, size_t imageIndex)
 
 	// swapchain image to present
 	{
-		Image::Transition transition{};
+		vkc::Image::Transition transition{};
 		//
 		{
 			transition.SrcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
@@ -535,7 +540,7 @@ void App::RecordCommandBuffer(CommandBuffer& commandBuffer, size_t imageIndex)
 	commandBuffer.End(m_Context);
 }
 
-void App::Submit(CommandBuffer& commandBuffer) const
+void App::Submit(vkc::CommandBuffer& commandBuffer) const
 {
 	VkSemaphoreSubmitInfo waitSemaphoreSubmitInfo{};
 	waitSemaphoreSubmitInfo.sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
