@@ -49,8 +49,7 @@ add_library(App STATIC
             ${HEADER})
 target_include_directories(${PROJECT_NAME} PRIVATE
                            ${CMAKE_CURRENT_SOURCE_DIR}/inc
-                           ${CMAKE_CURRENT_SOURCE_DIR}/src
-                           ${stb_SOURCE_DIR})
+                           ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_include_directories(${PROJECT_NAME} PUBLIC
                            ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -59,10 +58,13 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
                            GLM_FORCE_RADIANS
                            GLM_ENABLE_EXPERIMENTAL)
 
+message(STATUS "VulkanClasses source dir: ${VulkanClasses_SOURCE_DIR}")
+get_target_property(vulkan_inc VulkanClasses INTERFACE_INCLUDE_DIRECTORIES)
+message(STATUS "VulkanClasses include dirs: ${vulkan_inc}")
+
 target_link_libraries(${PROJECT_NAME} PUBLIC
                       VulkanClasses
-                      glm::glm
-                      assimp::assimp)
+                      glm::glm)
 
 foreach (shader IN LISTS SHADER_SOURCES)
 	Shader_Compile(${shader})
