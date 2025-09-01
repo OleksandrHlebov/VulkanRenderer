@@ -44,14 +44,16 @@ set(HEADER
     inc/camera.h
     inc/world_time.h
     inc/scene.h
-    inc/mesh.h)
+    inc/mesh.h
+    inc/HDRIRenderTarget.h)
 
 set(SOURCE
     src/app.cpp
     src/helper.cpp
     src/world_time.cpp
     src/scene.cpp
-    src/mesh.cpp)
+    src/mesh.cpp
+    src/HDRIRenderTarget.cpp)
 
 add_library(App STATIC
             ${SOURCE}

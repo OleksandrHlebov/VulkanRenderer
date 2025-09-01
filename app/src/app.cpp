@@ -266,9 +266,12 @@ void App::CreateDescriptorSetLayouts()
 	{
 		vkc::DescriptorSetLayoutBuilder builder{ m_Context };
 		vkc::DescriptorSetLayout        layout = builder
-										  .AddBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
+										  .AddBinding(0
+													  , VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
+													  , VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
 										  .AddBinding(1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
 										  .AddBinding(2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
+										  .AddBinding(3, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
 										  .Build();
 
 		m_FrameDescSetLayout = std::make_unique<vkc::DescriptorSetLayout>(std::move(layout));
@@ -311,6 +314,7 @@ void App::CreateDescriptorPool()
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight) // albedo
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight) // normals and material
+							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)
 							   .Build(2 * m_FramesInFlight);
 
 	m_DescPool = std::make_unique<vkc::DescriptorPool>(std::move(pool));
@@ -342,10 +346,16 @@ void App::CreateDescriptorSets()
 			normalsInfo.imageLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
 			normalsInfo.imageView   = *m_MaterialView;
 
+			VkDescriptorImageInfo depthInfo{};
+			depthInfo.sampler     = VK_NULL_HANDLE;
+			depthInfo.imageLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+			depthInfo.imageView   = *m_DepthImageView;
+
 			m_FrameDescriptorSets[index]
 				.AddWriteDescriptor({ &bufferInfo, 1 }, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, 0)
 				.AddWriteDescriptor({ &albedoInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, 0)
 				.AddWriteDescriptor({ &normalsInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 2, 0)
+				.AddWriteDescriptor({ &depthInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 3, 0)
 				.Update(m_Context);
 		}
 	}
@@ -419,6 +429,13 @@ void App::CreateGraphicsPipeline()
 									 .AddDescriptorSetLayout(*m_FrameDescSetLayout)
 									 .Build();
 		m_LightingPipelineLayout = std::make_unique<vkc::PipelineLayout>(std::move(layout));
+		VkDebugUtilsObjectNameInfoEXT debugNameInfo{};
+		debugNameInfo.sType        = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+		debugNameInfo.objectType   = VK_OBJECT_TYPE_PIPELINE_LAYOUT;
+		debugNameInfo.objectHandle = reinterpret_cast<uint64_t>(static_cast<VkPipelineLayout>(*m_LightingPipelineLayout));
+		debugNameInfo.pObjectName  = "Pipeline Layout (lighting)";
+		if (m_Context.DispatchTable.setDebugUtilsObjectNameEXT(&debugNameInfo) != VK_SUCCESS)
+			throw std::runtime_error("failed to set debug object name");
 	}
 
 	VkPipelineColorBlendAttachmentState blendAttachment{};
@@ -568,7 +585,7 @@ void App::CreateDepth()
 					   .SetType(VK_IMAGE_TYPE_2D)
 					   .SetAspectFlags(VK_IMAGE_ASPECT_DEPTH_BIT | help::HasStencilComponent(m_DepthFormat) *
 									   VK_IMAGE_ASPECT_STENCIL_BIT)
-					   .Build(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, false);
+					   .Build(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, false);
 	m_DepthImage = std::make_unique<vkc::Image>(std::move(image));
 
 	vkc::ImageView imageView = m_DepthImage->CreateView(m_Context, VK_IMAGE_VIEW_TYPE_2D, 0, 1, 0, 1, false);
@@ -685,6 +702,7 @@ void App::DoLightingPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
 		}
 		m_AlbedoImage->MakeTransition(m_Context, commandBuffer, transition);
 		m_MaterialImage->MakeTransition(m_Context, commandBuffer, transition);
+		m_DepthImage->MakeTransition(m_Context, commandBuffer, transition);
 	}
 
 	VkRenderingAttachmentInfo renderingAttachmentInfo{};
