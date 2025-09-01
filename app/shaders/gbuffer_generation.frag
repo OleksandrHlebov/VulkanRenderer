@@ -38,6 +38,7 @@ layout (location = 1) out vec4 outMaterial;
 void main()
 {
     vec3 normal = texture(sampler2D(textures[nonuniformEXT(textureIndices.Normals)], samp), inUV).rgb;
+    normal = normal * 2.0 - 1.0;
     normal = normalize(inTBN * normal);
 
     const float metalness = texture(sampler2D(textures[nonuniformEXT(textureIndices.Metalness)], samp), inUV).b;

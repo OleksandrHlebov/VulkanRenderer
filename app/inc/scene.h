@@ -51,7 +51,8 @@ public:
 
 private:
 	void     ProcessNode(aiNode const* node, aiScene const* scene, vkc::CommandBuffer& commandBuffer);
-	uint32_t LoadTexture(aiTextureType, aiMaterial const* material, vkc::CommandBuffer const& commandBuffer);
+	uint32_t LoadTexture
+	(aiTextureType, aiMaterial const* material, vkc::CommandBuffer const& commandBuffer, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB);
 
 	vkc::Context&     m_Context;
 	vkc::CommandPool& m_CommandPool;

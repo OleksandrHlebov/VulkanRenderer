@@ -108,8 +108,11 @@ void Scene::ProcessNode(aiNode const* node, aiScene const* scene, vkc::CommandBu
 		}
 
 		TextureIndices textureIndices{};
-		textureIndices.Diffuse   = LoadTexture(aiTextureType_DIFFUSE, scene->mMaterials[mesh->mMaterialIndex], commandBuffer);
-		textureIndices.Normals   = LoadTexture(aiTextureType_NORMALS, scene->mMaterials[mesh->mMaterialIndex], commandBuffer);
+		textureIndices.Diffuse = LoadTexture(aiTextureType_DIFFUSE, scene->mMaterials[mesh->mMaterialIndex], commandBuffer);
+		textureIndices.Normals = LoadTexture(aiTextureType_NORMALS
+											 , scene->mMaterials[mesh->mMaterialIndex]
+											 , commandBuffer
+											 , VK_FORMAT_R8G8B8A8_UNORM);
 		textureIndices.Metalness = LoadTexture(aiTextureType_METALNESS, scene->mMaterials[mesh->mMaterialIndex], commandBuffer);
 		textureIndices.Roughness = LoadTexture(aiTextureType_DIFFUSE_ROUGHNESS, scene->mMaterials[mesh->mMaterialIndex], commandBuffer);
 
@@ -143,7 +146,7 @@ void Scene::ProcessNode(aiNode const* node, aiScene const* scene, vkc::CommandBu
 		ProcessNode(node->mChildren[index], scene, commandBuffer);
 }
 
-uint32_t Scene::LoadTexture(aiTextureType type, aiMaterial const* material, vkc::CommandBuffer const& commandBuffer)
+uint32_t Scene::LoadTexture(aiTextureType type, aiMaterial const* material, vkc::CommandBuffer const& commandBuffer, VkFormat format)
 {
 	aiString str;
 	if (material->GetTextureCount(type))
@@ -169,7 +172,7 @@ uint32_t Scene::LoadTexture(aiTextureType type, aiMaterial const* material, vkc:
 
 		vkc::Image& image = m_TextureImages.emplace_back(vkc::ImageBuilder{ m_Context }
 														 .SetType(VK_IMAGE_TYPE_2D)
-														 .SetFormat(VK_FORMAT_R8G8B8A8_SRGB)
+														 .SetFormat(format)
 														 .SetAspectFlags(VK_IMAGE_ASPECT_COLOR_BIT)
 														 .SetExtent({
 																		static_cast<uint32_t>(imageData.Width)
