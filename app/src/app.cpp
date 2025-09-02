@@ -318,7 +318,7 @@ void App::GenerateShadowMaps()
 	std::ranges::sort(m_Scene->GetLights()
 					  , [](auto& l, auto& r)
 					  {
-						  return l.GetPosition().w < r.GetPosition().w;
+						  return l.GetMatrixIndex() < r.GetMatrixIndex();
 					  });
 	//
 	{
@@ -722,8 +722,7 @@ void App::CreateGraphicsPipeline()
 		vkc::ShaderStage quad{ m_Context, help::ReadFile("shaders/quad.spv"), VK_SHADER_STAGE_VERTEX_BIT };
 		vkc::ShaderStage lighting{ m_Context, help::ReadFile("shaders/lighting.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
 		lighting.AddSpecializationConstant(static_cast<uint32_t>(m_Scene->GetLights().size()));
-		bool const hasDirectionalLights{ m_Scene->GetLightMatrices().size() > 0 };
-		if (hasDirectionalLights)
+		if (!m_Scene->GetLightMatrices().empty())
 			lighting.AddSpecializationConstant(static_cast<uint32_t>(m_Scene->GetLightMatrices().size()));
 
 		VkFormat colorAttachmentFormats[]{ m_Context.Swapchain.image_format };
@@ -786,7 +785,7 @@ void App::CreateResources()
 			m_LightSSBOs.emplace_back(builder.Build(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
 													, lightCount * sizeof(Light)));
 			m_LightSSBOs[index].UpdateData(m_Scene->GetLights());
-			if (m_Scene->GetLightMatrices().size() > 0)
+			if (!m_Scene->GetLightMatrices().empty())
 			{
 				m_LightMatricesSSBOs.emplace_back(builder.Build(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
 																, lightMatricesCount * sizeof(glm::mat4)));
