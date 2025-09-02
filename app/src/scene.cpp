@@ -3,12 +3,14 @@
 #include "assimp/postprocess.h"
 #include "assimp/scene.h"
 
-#include "../inc/datatypes.h"
+#include "datatypes.h"
 
 #include <stdexcept>
 
 #include "command_pool.h"
 #include "helper.h"
+#include "glm/ext/matrix_transform.hpp"
+#include "glm/gtc/matrix_transform.hpp"
 
 Scene::Scene(vkc::Context& context, vkc::CommandPool& commandPool)
 	: m_Context{ context }
@@ -58,6 +60,61 @@ void Scene::LoadFirstMeshFromFile(std::string_view filename)
 {
 	std::string string{ filename };
 	m_Meshes.clear();
+}
+
+glm::mat4 Scene::CalculateLightSpaceMatrix(Light const& light) const
+{
+	if (light.Position.w == .0f)
+	{
+		glm::vec3 const sceneCenter    = (m_AABBMin + m_AABBMax) * .5f;
+		glm::vec3 const lightDirection = glm::normalize(glm::vec3{ -light.Position });
+
+		std::vector<glm::vec3> const corners
+		{
+			{ m_AABBMin.x, m_AABBMin.y, m_AABBMin.z }
+			, { m_AABBMax.x, m_AABBMin.y, m_AABBMin.z }
+			, { m_AABBMin.x, m_AABBMax.y, m_AABBMin.z }
+			, { m_AABBMax.x, m_AABBMax.y, m_AABBMin.z }
+			, { m_AABBMin.x, m_AABBMin.y, m_AABBMax.z }
+			, { m_AABBMax.x, m_AABBMin.y, m_AABBMax.z }
+			, { m_AABBMin.x, m_AABBMax.y, m_AABBMax.z }
+			, { m_AABBMax.x, m_AABBMax.y, m_AABBMax.z }
+		};
+
+		float minProj = FLT_MAX;
+		float maxProj = FLT_MIN;
+		for (glm::vec3 const& corner: corners)
+		{
+			const float proj = glm::dot(corner, lightDirection);
+			minProj          = std::min(minProj, proj);
+			maxProj          = std::max(maxProj, proj);
+		}
+
+		float const     distance = maxProj - glm::dot(sceneCenter, lightDirection);
+		glm::vec3 const lightPos = sceneCenter - lightDirection * distance;
+
+		glm::vec3 const up = glm::abs(glm::dot(lightDirection, glm::vec3(.0f, 1.f, .0f))) > .99f
+							 ? glm::vec3(.0f, .0f, 1.f)
+							 : glm::vec3(.0f, 1.f, .0f);
+
+		glm::mat4 const view = glm::lookAt(lightPos, sceneCenter, up);
+
+		glm::vec3 minLightSpace{ FLT_MAX };
+		glm::vec3 maxLightSpace{ FLT_MIN };
+		for (const glm::vec3& corner: corners)
+		{
+			auto const transformedCorner = glm::vec3{ view * glm::vec4(corner, 1.f) };
+			minLightSpace                = glm::min(minLightSpace, transformedCorner);
+			maxLightSpace                = glm::max(maxLightSpace, transformedCorner);
+		}
+
+		constexpr float near       = .0f;
+		const float     far        = maxLightSpace.z - minLightSpace.z;
+		glm::mat4       projection = glm::ortho(minLightSpace.x, maxLightSpace.x, minLightSpace.y, maxLightSpace.y, near, far);
+		projection[1][1] *= -1;
+		return projection * view;
+	}
+	return {};
 }
 
 void Scene::AddLight(Light&& light)

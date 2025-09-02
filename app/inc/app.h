@@ -51,6 +51,7 @@ private:
 	void CreateGraphicsPipeline();
 	void CreateCmdPool();
 	void CreateDescriptorSetLayouts();
+	void GenerateShadowMaps();
 	void CreateResources();
 	void CreateGBuffer();
 	void CreateDepth();
@@ -96,6 +97,9 @@ private:
 
 	std::vector<vkc::Image>     m_SwapchainImages;
 	std::vector<vkc::ImageView> m_SwapchainImageViews;
+
+	std::vector<vkc::Image>     m_DirectionalShadowMaps;
+	std::vector<vkc::ImageView> m_DirectionalShadowMapViews;
 
 	uptr<vkc::CommandPool> m_CommandPool{};
 

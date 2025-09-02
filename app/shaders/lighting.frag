@@ -28,13 +28,8 @@ struct Light
 layout(constant_id = 0) const uint LIGHT_COUNT = 1u;
 layout(std430, set = 1, binding = 4) readonly buffer LightsSSBO
 {
-    Light data[LIGHT_COUNT];
-} lights;
-//Light lights[] = Light[]
-//(
-////Light(vec4(.0f, .5f, .0f, 1.f), vec4(1.f, .0f, .0f, 100.f))
-//Light(vec4(.877f, .877f, .577f, .0f), vec4(vec3(.877f, .653f, .333f), 100.f))
-//);
+    Light lights[LIGHT_COUNT];
+};
 
 float DistributionGGX(vec3 N, vec3 H, float a)
 {
@@ -118,22 +113,22 @@ void main()
     for (uint lightIndex = 0u; lightIndex < LIGHT_COUNT; ++lightIndex)
     {
 
-        const float isPoint = lights.data[lightIndex].position.w;
+        const float isPoint = lights[lightIndex].position.w;
         const float isDirectional = 1.f - isPoint;
 
-        const vec3 lightDirection = normalize(isPoint * (lights.data[lightIndex].position.xyz - worldPosition)
-        + isDirectional * lights.data[lightIndex].position.xyz);
+        const vec3 lightDirection = normalize(isPoint * (lights[lightIndex].position.xyz - worldPosition)
+        + isDirectional * lights[lightIndex].position.xyz);
 
         const vec3 halfway = normalize(viewDirection + lightDirection);
 
-        const float lumen = lights.data[lightIndex].colour.a;
+        const float lumen = lights[lightIndex].colour.a;
         const float luminousIntensity = lumen / (4.f * PI);
-        const float distance = length(lights.data[lightIndex].position.xyz - worldPosition);
+        const float distance = length(lights[lightIndex].position.xyz - worldPosition);
         const float attenuation = 1.f / max(distance * distance, 0.0001f);
 
         const float illuminance = isPoint * luminousIntensity * attenuation
-        + isDirectional * lights.data[lightIndex].colour.a;
-        const vec3 irradiance = lights.data[lightIndex].colour.rgb * illuminance;
+        + isDirectional * lights[lightIndex].colour.a;
+        const vec3 irradiance = lights[lightIndex].colour.rgb * illuminance;
         const vec3 F = FresnelSchlick(max(dot(halfway, viewDirection), .0f), F0);
         const float NDF = DistributionGGX(normal, halfway, roughness);
         const float G = GeometrySmith(normal, viewDirection, lightDirection, roughness);

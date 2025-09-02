@@ -34,6 +34,7 @@ set(SHADER_SOURCES
     "basic_transform.vert"
     "alpha_discard.frag"
     "transform_w_normals.vert"
+    "transform_to_lightspace.vert"
     "gbuffer_generation.frag"
     "lighting.frag"
     "quad.vert")

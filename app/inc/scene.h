@@ -54,6 +54,8 @@ public:
 		return m_Lights;
 	}
 
+	[[nodiscard]] glm::mat4 CalculateLightSpaceMatrix(Light const& light) const;
+
 	void AddLight(Light&& light);
 	void AddLight(Light const& light);
 	void AddLight(glm::vec3 const& position, bool isPoint, glm::vec3 const& colour, float intensity);
