@@ -28,6 +28,7 @@ public:
 	template<typename T>
 	using uptr = std::unique_ptr<T>;
 
+	void CreateScene();
 	App(int width, int height);
 	~App();
 
@@ -99,6 +100,7 @@ private:
 	uptr<vkc::CommandPool> m_CommandPool{};
 
 	std::vector<vkc::Buffer> m_MVPUBOs{};
+	std::vector<vkc::Buffer> m_LightSSBOs{};
 
 	std::vector<vkc::DescriptorSet> m_FrameDescriptorSets{};
 	std::vector<vkc::DescriptorSet> m_GlobalDescriptorSets{};

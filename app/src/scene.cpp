@@ -14,7 +14,7 @@ Scene::Scene(vkc::Context& context, vkc::CommandPool& commandPool)
 	: m_Context{ context }
 	, m_CommandPool{ commandPool } {}
 
-void Scene::LoadScene(std::string_view filename)
+void Scene::Load(std::string_view filename)
 {
 	Assimp::Importer importer;
 	const aiScene*   scene = importer.ReadFile(filename.data()
@@ -58,6 +58,21 @@ void Scene::LoadFirstMeshFromFile(std::string_view filename)
 {
 	std::string string{ filename };
 	m_Meshes.clear();
+}
+
+void Scene::AddLight(Light&& light)
+{
+	m_Lights.emplace_back(light);
+}
+
+void Scene::AddLight(const Light& light)
+{
+	m_Lights.emplace_back(light);
+}
+
+void Scene::AddLight(glm::vec3 const& position, bool isPoint, glm::vec3 const& colour, float intensity)
+{
+	m_Lights.emplace_back(position, isPoint, colour, intensity);
 }
 
 void Scene::ProcessNode(aiNode const* node, aiScene const* scene, vkc::CommandBuffer& commandBuffer)

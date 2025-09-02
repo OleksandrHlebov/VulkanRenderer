@@ -35,9 +35,7 @@ App::App(int width, int height)
 		vkb::destroy_swapchain(m_Context.Swapchain);
 	});
 	CreateCmdPool();
-	m_Scene = std::make_unique<Scene>(m_Context, *m_CommandPool);
-	m_Scene->LoadScene("data/glTF/Sponza.gltf");
-	std::cout << (m_Scene->ContainsPBRInfo() ? "scene contains pbr info" : "scene does not contain pbr info") << std::endl;
+	CreateScene();
 	// CreateVertexBuffer();
 	CreateResources();
 	CreateDescriptorSetLayouts();
@@ -272,6 +270,9 @@ void App::CreateDescriptorSetLayouts()
 										  .AddBinding(1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
 										  .AddBinding(2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
 										  .AddBinding(3, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
+										  .AddBinding(4
+													  , VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
+													  , VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT)
 										  .Build();
 
 		m_FrameDescSetLayout = std::make_unique<vkc::DescriptorSetLayout>(std::move(layout));
@@ -310,11 +311,12 @@ void App::CreateDescriptorPool()
 	vkc::DescriptorPoolBuilder builder{ m_Context };
 	vkc::DescriptorPool        pool = builder
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, m_FramesInFlight) // mvp
+							   .AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, m_FramesInFlight) // light data
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLER, m_FramesInFlight)        // sampler
-							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)
-							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight) // albedo
-							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight) // normals and material
-							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)
+							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)  // textures
+							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)  // albedo
+							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)  // normals and material
+							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)  // depth
 							   .Build(2 * m_FramesInFlight);
 
 	m_DescPool = std::make_unique<vkc::DescriptorPool>(std::move(pool));
@@ -351,11 +353,17 @@ void App::CreateDescriptorSets()
 			depthInfo.imageLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
 			depthInfo.imageView   = *m_DepthImageView;
 
+			VkDescriptorBufferInfo lightInfo{};
+			lightInfo.buffer = m_LightSSBOs[index];
+			lightInfo.range  = VK_WHOLE_SIZE;
+			lightInfo.offset = 0;
+
 			m_FrameDescriptorSets[index]
 				.AddWriteDescriptor({ &bufferInfo, 1 }, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, 0)
 				.AddWriteDescriptor({ &albedoInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, 0)
 				.AddWriteDescriptor({ &normalsInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 2, 0)
 				.AddWriteDescriptor({ &depthInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 3, 0)
+				.AddWriteDescriptor({ &lightInfo, 1 }, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4, 0)
 				.Update(m_Context);
 		}
 	}
@@ -499,6 +507,7 @@ void App::CreateGraphicsPipeline()
 	{
 		vkc::ShaderStage quad{ m_Context, help::ReadFile("shaders/quad.spv"), VK_SHADER_STAGE_VERTEX_BIT };
 		vkc::ShaderStage lighting{ m_Context, help::ReadFile("shaders/lighting.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
+		lighting.AddSpecializationConstant(static_cast<uint32_t>(m_LightSSBOs.size()));
 
 		VkFormat colorAttachmentFormats[]{ m_Context.Swapchain.image_format };
 
@@ -528,6 +537,14 @@ void App::CreateCmdPool()
 													   , VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 }
 
+void App::CreateScene()
+{
+	m_Scene = std::make_unique<Scene>(m_Context, *m_CommandPool);
+	m_Scene->Load("data/glTF/Sponza.gltf");
+	m_Scene->AddLight({ .877f, .877f, .577f }, false, { .877f, .653f, .333f }, 100.f);
+	std::cout << (m_Scene->ContainsPBRInfo() ? "scene contains pbr info" : "scene does not contain pbr info") << std::endl;
+}
+
 void App::CreateResources()
 {
 	// mvp ubo
@@ -537,6 +554,21 @@ void App::CreateResources()
 
 		for (uint32_t index{}; index < m_FramesInFlight; ++index)
 			m_MVPUBOs.emplace_back(builder.Build(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, sizeof(ModelViewProj)));
+	}
+	// lights ssbo
+	{
+		vkc::BufferBuilder builder{ m_Context };
+		builder.MapMemory().SetMemoryUsage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+		for (uint32_t index{}; index < m_FramesInFlight; ++index)
+		{
+			m_LightSSBOs.emplace_back(builder.Build(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, sizeof(Light)));
+			m_LightSSBOs[index].UpdateData(m_Scene->GetLights());
+			help::NameObject(m_Context
+							 , reinterpret_cast<uint64_t>(static_cast<VkBuffer>(m_LightSSBOs[index]))
+							 , VK_OBJECT_TYPE_BUFFER
+							 , "Light SSBO");
+		}
 	}
 	CreateDepth();
 	CreateGBuffer();

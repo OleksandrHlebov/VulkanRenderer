@@ -20,6 +20,20 @@ struct TextureIndices
 	uint32_t Roughness;
 };
 
+struct Light
+{
+	Light() = default;
+
+	Light(glm::vec3 const& position, bool isPoint, glm::vec3 const& colour, float intensity)
+		: Position{ position.x, position.y, position.z, isPoint ? 1.f : .0f }
+		, Colour{ colour }
+		, Intensity{ intensity } {}
+
+	glm::vec4 Position;
+	glm::vec3 Colour;
+	float     Intensity;
+};
+
 struct Vertex
 {
 	glm::vec3 Position;

@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "vulkan/vulkan_core.h"
+#include "Context.h"
 
 namespace help
 {
@@ -61,6 +62,18 @@ namespace help
 	};
 
 	ImageData LoadImage(std::string_view path);
+
+	inline void NameObject(vkc::Context const& context, uint64_t handle, VkObjectType type, std::string_view name)
+	{
+		VkDebugUtilsObjectNameInfoEXT nameInfo{};
+		nameInfo.sType        = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+		nameInfo.objectType   = type;
+		nameInfo.objectHandle = handle;
+		nameInfo.pObjectName  = name.data();
+
+		if (context.DispatchTable.setDebugUtilsObjectNameEXT(&nameInfo) != VK_SUCCESS)
+			throw std::runtime_error("failed to set debug object name");
+	}
 }
 
 #endif //HELPER_H

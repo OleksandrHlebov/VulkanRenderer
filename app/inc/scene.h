@@ -25,11 +25,11 @@ public:
 	Scene& operator=(Scene&&)      = delete;
 	Scene& operator=(Scene const&) = delete;
 
-	void LoadScene(std::string_view filename);
+	void Load(std::string_view filename);
 
 	void LoadFirstMeshFromFile(std::string_view filename);
 
-	bool ContainsPBRInfo() const
+	[[nodiscard]] bool ContainsPBRInfo() const
 	{
 		return m_ContainsPBRInfo;
 	};
@@ -49,6 +49,15 @@ public:
 		return m_TextureImageViews;
 	}
 
+	[[nodiscard]] std::span<Light> GetLights()
+	{
+		return m_Lights;
+	}
+
+	void AddLight(Light&& light);
+	void AddLight(Light const& light);
+	void AddLight(glm::vec3 const& position, bool isPoint, glm::vec3 const& colour, float intensity);
+
 private:
 	void     ProcessNode(aiNode const* node, aiScene const* scene, vkc::CommandBuffer& commandBuffer);
 	uint32_t LoadTexture
@@ -59,7 +68,8 @@ private:
 
 	std::stack<vkc::Buffer> m_StagingBuffers;
 
-	std::list<Mesh> m_Meshes;
+	std::list<Mesh>    m_Meshes;
+	std::vector<Light> m_Lights;
 
 	std::vector<vkc::Image>                   m_TextureImages;
 	std::vector<vkc::ImageView>               m_TextureImageViews;
