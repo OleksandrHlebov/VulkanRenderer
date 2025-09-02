@@ -26,7 +26,7 @@ struct Light
     uint matrixIndex;
 };
 
-layout(constant_id = 0) const uint LIGHT_COUNT = 2u;
+layout(constant_id = 0) const uint LIGHT_COUNT = 1u;
 layout(constant_id = 1) const uint DIRECTIONAL_LIGHT_COUNT = 1u;
 layout(std430, set = 1, binding = 4) readonly buffer LightsSSBO
 {

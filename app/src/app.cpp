@@ -328,6 +328,10 @@ void App::GenerateShadowMaps()
 								  {
 									  return light.GetPosition().w == .0f;
 								  });
+
+		if (directionalLightCount == 0)
+			return;
+
 		constexpr VkExtent2D shadowMapResolution{ 1024, 1024 };
 		vkc::ImageBuilder    builder{ m_Context };
 		builder
@@ -552,10 +556,15 @@ void App::CreateDescriptorSets()
 			lightInfo.range  = VK_WHOLE_SIZE;
 			lightInfo.offset = 0;
 
-			VkDescriptorBufferInfo lightMatricesInfo{};
-			lightMatricesInfo.buffer = m_LightMatricesSSBOs[index];
-			lightMatricesInfo.range  = VK_WHOLE_SIZE;
-			lightMatricesInfo.offset = 0;
+			if (!m_LightMatricesSSBOs.empty())
+			{
+				VkDescriptorBufferInfo lightMatricesInfo{};
+				lightMatricesInfo.buffer = m_LightMatricesSSBOs[index];
+				lightMatricesInfo.range  = VK_WHOLE_SIZE;
+				lightMatricesInfo.offset = 0;
+				m_FrameDescriptorSets[index]
+					.AddWriteDescriptor({ &lightMatricesInfo, 1 }, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 5, 0);
+			}
 
 			VkDescriptorImageInfo shadowSamplerInfo{};
 			shadowSamplerInfo.sampler     = m_ShadowSampler;
@@ -568,7 +577,6 @@ void App::CreateDescriptorSets()
 				.AddWriteDescriptor({ &normalsInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 2, 0)
 				.AddWriteDescriptor({ &depthInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 3, 0)
 				.AddWriteDescriptor({ &lightInfo, 1 }, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4, 0)
-				.AddWriteDescriptor({ &lightMatricesInfo, 1 }, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 5, 0)
 				.AddWriteDescriptor({ &shadowSamplerInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLER, 6, 0)
 				.Update(m_Context);
 		}
@@ -714,7 +722,9 @@ void App::CreateGraphicsPipeline()
 		vkc::ShaderStage quad{ m_Context, help::ReadFile("shaders/quad.spv"), VK_SHADER_STAGE_VERTEX_BIT };
 		vkc::ShaderStage lighting{ m_Context, help::ReadFile("shaders/lighting.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
 		lighting.AddSpecializationConstant(static_cast<uint32_t>(m_Scene->GetLights().size()));
-		lighting.AddSpecializationConstant(static_cast<uint32_t>(m_Scene->GetLightMatrices().size()));
+		bool const hasDirectionalLights{ m_Scene->GetLightMatrices().size() > 0 };
+		if (hasDirectionalLights)
+			lighting.AddSpecializationConstant(static_cast<uint32_t>(m_Scene->GetLightMatrices().size()));
 
 		VkFormat colorAttachmentFormats[]{ m_Context.Swapchain.image_format };
 
@@ -775,19 +785,22 @@ void App::CreateResources()
 		{
 			m_LightSSBOs.emplace_back(builder.Build(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
 													, lightCount * sizeof(Light)));
-			m_LightMatricesSSBOs.emplace_back(builder.Build(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
-															, lightMatricesCount * sizeof(glm::mat4)));
-
 			m_LightSSBOs[index].UpdateData(m_Scene->GetLights());
-			m_LightMatricesSSBOs[index].UpdateData(m_Scene->GetLightMatrices());
+			if (m_Scene->GetLightMatrices().size() > 0)
+			{
+				m_LightMatricesSSBOs.emplace_back(builder.Build(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+																, lightMatricesCount * sizeof(glm::mat4)));
+
+				m_LightMatricesSSBOs[index].UpdateData(m_Scene->GetLightMatrices());
+				help::NameObject(m_Context
+								 , reinterpret_cast<uint64_t>(static_cast<VkBuffer>(m_LightMatricesSSBOs[index]))
+								 , VK_OBJECT_TYPE_BUFFER
+								 , "Light matrices SSBO");
+			}
 			help::NameObject(m_Context
 							 , reinterpret_cast<uint64_t>(static_cast<VkBuffer>(m_LightSSBOs[index]))
 							 , VK_OBJECT_TYPE_BUFFER
 							 , "Light SSBO");
-			help::NameObject(m_Context
-							 , reinterpret_cast<uint64_t>(static_cast<VkBuffer>(m_LightMatricesSSBOs[index]))
-							 , VK_OBJECT_TYPE_BUFFER
-							 , "Light matrices SSBO");
 		}
 	}
 	CreateDepth();
