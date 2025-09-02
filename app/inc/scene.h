@@ -51,10 +51,20 @@ public:
 
 	[[nodiscard]] std::span<Light> GetLights()
 	{
-		return m_Lights;
+		return m_LightData.Lights;
 	}
 
-	[[nodiscard]] glm::mat4 CalculateLightSpaceMatrix(Light const& light) const;
+	[[nodiscard]] std::span<glm::mat4> GetLightMatrices()
+	{
+		return m_LightData.LightSpaceMatrices;
+	}
+
+	[[nodiscard]] LightData const& GetLightData() const
+	{
+		return m_LightData;
+	}
+
+	[[nodiscard]] glm::mat4 CalculateLightSpaceMatrix(glm::vec3 const& direction) const;
 
 	void AddLight(Light&& light);
 	void AddLight(Light const& light);
@@ -70,8 +80,8 @@ private:
 
 	std::stack<vkc::Buffer> m_StagingBuffers;
 
-	std::list<Mesh>    m_Meshes;
-	std::vector<Light> m_Lights;
+	std::list<Mesh> m_Meshes;
+	LightData       m_LightData;
 
 	std::vector<vkc::Image>                   m_TextureImages;
 	std::vector<vkc::ImageView>               m_TextureImageViews;

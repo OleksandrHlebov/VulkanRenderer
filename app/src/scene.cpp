@@ -62,74 +62,80 @@ void Scene::LoadFirstMeshFromFile(std::string_view filename)
 	m_Meshes.clear();
 }
 
-glm::mat4 Scene::CalculateLightSpaceMatrix(Light const& light) const
+glm::mat4 Scene::CalculateLightSpaceMatrix(glm::vec3 const& direction) const
 {
-	if (light.Position.w == .0f)
+	glm::vec3 const sceneCenter    = (m_AABBMin + m_AABBMax) * .5f;
+	glm::vec3 const lightDirection = glm::normalize(glm::vec3{ -direction });
+
+	std::vector<glm::vec3> const corners
 	{
-		glm::vec3 const sceneCenter    = (m_AABBMin + m_AABBMax) * .5f;
-		glm::vec3 const lightDirection = glm::normalize(glm::vec3{ -light.Position });
+		{ m_AABBMin.x, m_AABBMin.y, m_AABBMin.z }
+		, { m_AABBMax.x, m_AABBMin.y, m_AABBMin.z }
+		, { m_AABBMin.x, m_AABBMax.y, m_AABBMin.z }
+		, { m_AABBMax.x, m_AABBMax.y, m_AABBMin.z }
+		, { m_AABBMin.x, m_AABBMin.y, m_AABBMax.z }
+		, { m_AABBMax.x, m_AABBMin.y, m_AABBMax.z }
+		, { m_AABBMin.x, m_AABBMax.y, m_AABBMax.z }
+		, { m_AABBMax.x, m_AABBMax.y, m_AABBMax.z }
+	};
 
-		std::vector<glm::vec3> const corners
-		{
-			{ m_AABBMin.x, m_AABBMin.y, m_AABBMin.z }
-			, { m_AABBMax.x, m_AABBMin.y, m_AABBMin.z }
-			, { m_AABBMin.x, m_AABBMax.y, m_AABBMin.z }
-			, { m_AABBMax.x, m_AABBMax.y, m_AABBMin.z }
-			, { m_AABBMin.x, m_AABBMin.y, m_AABBMax.z }
-			, { m_AABBMax.x, m_AABBMin.y, m_AABBMax.z }
-			, { m_AABBMin.x, m_AABBMax.y, m_AABBMax.z }
-			, { m_AABBMax.x, m_AABBMax.y, m_AABBMax.z }
-		};
-
-		float minProj = FLT_MAX;
-		float maxProj = FLT_MIN;
-		for (glm::vec3 const& corner: corners)
-		{
-			const float proj = glm::dot(corner, lightDirection);
-			minProj          = std::min(minProj, proj);
-			maxProj          = std::max(maxProj, proj);
-		}
-
-		float const     distance = maxProj - glm::dot(sceneCenter, lightDirection);
-		glm::vec3 const lightPos = sceneCenter - lightDirection * distance;
-
-		glm::vec3 const up = glm::abs(glm::dot(lightDirection, glm::vec3(.0f, 1.f, .0f))) > .99f
-							 ? glm::vec3(.0f, .0f, 1.f)
-							 : glm::vec3(.0f, 1.f, .0f);
-
-		glm::mat4 const view = glm::lookAt(lightPos, sceneCenter, up);
-
-		glm::vec3 minLightSpace{ FLT_MAX };
-		glm::vec3 maxLightSpace{ FLT_MIN };
-		for (const glm::vec3& corner: corners)
-		{
-			auto const transformedCorner = glm::vec3{ view * glm::vec4(corner, 1.f) };
-			minLightSpace                = glm::min(minLightSpace, transformedCorner);
-			maxLightSpace                = glm::max(maxLightSpace, transformedCorner);
-		}
-
-		constexpr float near       = .0f;
-		const float     far        = maxLightSpace.z - minLightSpace.z;
-		glm::mat4       projection = glm::ortho(minLightSpace.x, maxLightSpace.x, minLightSpace.y, maxLightSpace.y, near, far);
-		projection[1][1] *= -1;
-		return projection * view;
+	float minProj = FLT_MAX;
+	float maxProj = FLT_MIN;
+	for (glm::vec3 const& corner: corners)
+	{
+		const float proj = glm::dot(corner, lightDirection);
+		minProj          = std::min(minProj, proj);
+		maxProj          = std::max(maxProj, proj);
 	}
-	return {};
+
+	float const     distance = maxProj - glm::dot(sceneCenter, lightDirection);
+	glm::vec3 const lightPos = sceneCenter - lightDirection * distance;
+
+	glm::vec3 const up = glm::abs(glm::dot(lightDirection, glm::vec3(.0f, 1.f, .0f))) > .99f
+						 ? glm::vec3(.0f, .0f, 1.f)
+						 : glm::vec3(.0f, 1.f, .0f);
+
+	glm::mat4 const view = glm::lookAt(lightPos, sceneCenter, up);
+
+	glm::vec3 minLightSpace{ FLT_MAX };
+	glm::vec3 maxLightSpace{ FLT_MIN };
+	for (const glm::vec3& corner: corners)
+	{
+		auto const transformedCorner = glm::vec3{ view * glm::vec4(corner, 1.f) };
+		minLightSpace                = glm::min(minLightSpace, transformedCorner);
+		maxLightSpace                = glm::max(maxLightSpace, transformedCorner);
+	}
+
+	constexpr float near       = .0f;
+	const float     far        = maxLightSpace.z - minLightSpace.z;
+	glm::mat4       projection = glm::ortho(minLightSpace.x, maxLightSpace.x, minLightSpace.y, maxLightSpace.y, near, far);
+	projection[1][1] *= -1;
+	return projection * view;
 }
 
 void Scene::AddLight(Light&& light)
 {
-	m_Lights.emplace_back(light);
+	m_LightData.Lights.emplace_back(light);
+	if (!light.IsPoint())
+	{
+		m_LightData.LightSpaceMatrices.emplace_back(CalculateLightSpaceMatrix(light.m_Position));
+		m_LightData.Lights.back().m_MatrixIndex = static_cast<uint32_t>(m_LightData.LightSpaceMatrices.size() - 1);
+	}
 }
 
-void Scene::AddLight(const Light& light)
+void Scene::AddLight(Light const& light)
 {
-	m_Lights.emplace_back(light);
+	m_LightData.Lights.emplace_back(light);
+	if (!light.IsPoint())
+	{
+		m_LightData.LightSpaceMatrices.emplace_back(CalculateLightSpaceMatrix(light.m_Position));
+		m_LightData.Lights.back().m_MatrixIndex = static_cast<uint32_t>(m_LightData.LightSpaceMatrices.size() - 1);
+	}
 }
 
 void Scene::AddLight(glm::vec3 const& position, bool isPoint, glm::vec3 const& colour, float intensity)
 {
-	m_Lights.emplace_back(position, isPoint, colour, intensity);
+	AddLight(Light{ position, isPoint, colour, intensity });
 }
 
 void Scene::ProcessNode(aiNode const* node, aiScene const* scene, vkc::CommandBuffer& commandBuffer)

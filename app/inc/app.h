@@ -94,6 +94,7 @@ private:
 	uptr<vkc::ImageView> m_MaterialView{};
 
 	VkSampler m_TextureSampler{};
+	VkSampler m_ShadowSampler{};
 
 	std::vector<vkc::Image>     m_SwapchainImages;
 	std::vector<vkc::ImageView> m_SwapchainImageViews;
@@ -105,6 +106,7 @@ private:
 
 	std::vector<vkc::Buffer> m_MVPUBOs{};
 	std::vector<vkc::Buffer> m_LightSSBOs{};
+	std::vector<vkc::Buffer> m_LightMatricesSSBOs{};
 
 	std::vector<vkc::DescriptorSet> m_FrameDescriptorSets{};
 	std::vector<vkc::DescriptorSet> m_GlobalDescriptorSets{};

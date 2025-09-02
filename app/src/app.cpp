@@ -271,10 +271,10 @@ void App::CreateDescriptorSetLayouts()
 										  .AddBinding(1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
 										  .AddBinding(2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
 										  .AddBinding(3, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
-										  .AddBinding(4
-													  , VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
-													  , VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT)
-										  .AddBinding(5, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
+										  .AddBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT)
+										  .AddBinding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT)
+										  .AddBinding(6, VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+										  .AddBinding(7, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
 										  .Build();
 
 		m_FrameDescSetLayout = std::make_unique<vkc::DescriptorSetLayout>(std::move(layout));
@@ -291,9 +291,14 @@ void App::CreateDescriptorSetLayouts()
 
 		m_Context.DispatchTable.createSampler(&samplerCreateInfo, nullptr, &m_TextureSampler);
 
+		samplerCreateInfo.compareEnable = VK_TRUE;
+		samplerCreateInfo.compareOp     = VK_COMPARE_OP_LESS;
+		m_Context.DispatchTable.createSampler(&samplerCreateInfo, nullptr, &m_ShadowSampler);
+
 		m_Context.DeletionQueue.Push([this]
 		{
 			m_Context.DispatchTable.destroySampler(m_TextureSampler, nullptr);
+			m_Context.DispatchTable.destroySampler(m_ShadowSampler, nullptr);
 		});
 
 		vkc::DescriptorSetLayoutBuilder builder{ m_Context };
@@ -313,7 +318,7 @@ void App::GenerateShadowMaps()
 	std::ranges::sort(m_Scene->GetLights()
 					  , [](auto& l, auto& r)
 					  {
-						  return l.Position.w < r.Position.w;
+						  return l.GetPosition().w < r.GetPosition().w;
 					  });
 	//
 	{
@@ -321,7 +326,7 @@ void App::GenerateShadowMaps()
 			std::ranges::count_if(m_Scene->GetLights()
 								  , [](auto& light)
 								  {
-									  return light.Position.w == .0f;
+									  return light.GetPosition().w == .0f;
 								  });
 		constexpr VkExtent2D shadowMapResolution{ 1024, 1024 };
 		vkc::ImageBuilder    builder{ m_Context };
@@ -365,6 +370,7 @@ void App::GenerateShadowMaps()
 								 .AddViewport(shadowMapResolution)
 								 .EnableDepthTest(VK_COMPARE_OP_LESS)
 								 .EnableDepthWrite()
+								 .SetDepthBias(1.25f, 1.f)
 								 .SetFrontFace(VK_FRONT_FACE_COUNTER_CLOCKWISE)
 								 .SetCullMode(VK_CULL_MODE_BACK_BIT)
 								 .SetPolygonMode(VK_POLYGON_MODE_FILL)
@@ -420,8 +426,7 @@ void App::GenerateShadowMaps()
 														  , 0
 														  , nullptr);
 
-			glm::mat4 const lightSpace = m_Scene->CalculateLightSpaceMatrix(m_Scene->GetLights()[0]);
-			// glm::mat4 const lightSpace = glm::mat4{ 1 };
+			glm::mat4 const lightSpace = m_Scene->GetLightMatrices()[m_Scene->GetLights()[index].GetMatrixIndex()];
 			m_Context.DispatchTable.cmdPushConstants(commandBuffer
 													 , pipelineLayout
 													 , VK_SHADER_STAGE_VERTEX_BIT
@@ -455,6 +460,16 @@ void App::GenerateShadowMaps()
 													   , 0);
 			}
 			m_Context.DispatchTable.cmdEndRendering(commandBuffer);
+			//
+			{
+				vkc::Image::Transition transition{ shadowView };
+				transition.NewLayout     = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+				transition.SrcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+				transition.DstAccessMask = VK_ACCESS_NONE;
+				transition.SrcStageMask  = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+				transition.DstStageMask  = VK_PIPELINE_STAGE_NONE;
+				shadowMap.MakeTransition(m_Context, commandBuffer, transition);
+			}
 		}
 
 		commandBuffer.End(m_Context);
@@ -463,6 +478,22 @@ void App::GenerateShadowMaps()
 			throw std::runtime_error("failed to wait for command buffer fence");
 		pipeline.Destroy(m_Context);
 		pipelineLayout.Destroy(m_Context);
+
+		std::vector<VkDescriptorImageInfo> imageInfos;
+		imageInfos.reserve(m_Scene->GetLightMatrices().size());
+
+		for (auto [image, view]{ std::make_pair(m_DirectionalShadowMaps.begin(), m_DirectionalShadowMapViews.begin()) };
+			 image != m_DirectionalShadowMaps.end() && view != m_DirectionalShadowMapViews.end();
+			 ++image, ++view)
+		{
+			imageInfos.emplace_back(VK_NULL_HANDLE, *view, image->GetLayout());
+		}
+		for (auto& descriptorSet: m_FrameDescriptorSets)
+		{
+			descriptorSet
+				.AddWriteDescriptor(imageInfos, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 7, 0)
+				.Update(m_Context);
+		}
 	}
 }
 
@@ -472,11 +503,14 @@ void App::CreateDescriptorPool()
 	vkc::DescriptorPool        pool = builder
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, m_FramesInFlight) // mvp
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, m_FramesInFlight) // light data
+							   .AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, m_FramesInFlight) // light data
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLER, m_FramesInFlight)        // sampler
+							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLER, m_FramesInFlight)        // shadow sampler
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)  // textures
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)  // albedo
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)  // normals and material
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)  // depth
+							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)  // shadow maps
 							   .Build(2 * m_FramesInFlight);
 
 	m_DescPool = std::make_unique<vkc::DescriptorPool>(std::move(pool));
@@ -518,12 +552,24 @@ void App::CreateDescriptorSets()
 			lightInfo.range  = VK_WHOLE_SIZE;
 			lightInfo.offset = 0;
 
+			VkDescriptorBufferInfo lightMatricesInfo{};
+			lightMatricesInfo.buffer = m_LightMatricesSSBOs[index];
+			lightMatricesInfo.range  = VK_WHOLE_SIZE;
+			lightMatricesInfo.offset = 0;
+
+			VkDescriptorImageInfo shadowSamplerInfo{};
+			shadowSamplerInfo.sampler     = m_ShadowSampler;
+			shadowSamplerInfo.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			shadowSamplerInfo.imageView   = VK_NULL_HANDLE;
+
 			m_FrameDescriptorSets[index]
 				.AddWriteDescriptor({ &bufferInfo, 1 }, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, 0)
 				.AddWriteDescriptor({ &albedoInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, 0)
 				.AddWriteDescriptor({ &normalsInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 2, 0)
 				.AddWriteDescriptor({ &depthInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 3, 0)
 				.AddWriteDescriptor({ &lightInfo, 1 }, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4, 0)
+				.AddWriteDescriptor({ &lightMatricesInfo, 1 }, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 5, 0)
+				.AddWriteDescriptor({ &shadowSamplerInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLER, 6, 0)
 				.Update(m_Context);
 		}
 	}
@@ -667,7 +713,8 @@ void App::CreateGraphicsPipeline()
 	{
 		vkc::ShaderStage quad{ m_Context, help::ReadFile("shaders/quad.spv"), VK_SHADER_STAGE_VERTEX_BIT };
 		vkc::ShaderStage lighting{ m_Context, help::ReadFile("shaders/lighting.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
-		lighting.AddSpecializationConstant(static_cast<uint32_t>(m_LightSSBOs.size()));
+		lighting.AddSpecializationConstant(static_cast<uint32_t>(m_Scene->GetLights().size()));
+		lighting.AddSpecializationConstant(static_cast<uint32_t>(m_Scene->GetLightMatrices().size()));
 
 		VkFormat colorAttachmentFormats[]{ m_Context.Swapchain.image_format };
 
@@ -702,6 +749,7 @@ void App::CreateScene()
 	m_Scene = std::make_unique<Scene>(m_Context, *m_CommandPool);
 	m_Scene->Load("data/glTF/Sponza.gltf");
 	m_Scene->AddLight({ .877f, .877f, .577f }, false, { .877f, .653f, .333f }, 100.f);
+	m_Scene->AddLight({ -4.f, 1.f, .0f }, true, { 1.f, .0f, .0f }, 100.f);
 	std::cout << (m_Scene->ContainsPBRInfo() ? "scene contains pbr info" : "scene does not contain pbr info") << std::endl;
 }
 
@@ -720,14 +768,26 @@ void App::CreateResources()
 		vkc::BufferBuilder builder{ m_Context };
 		builder.MapMemory().SetMemoryUsage(VMA_MEMORY_USAGE_CPU_TO_GPU);
 
+		size_t const lightCount         = m_Scene->GetLights().size();
+		size_t const lightMatricesCount = m_Scene->GetLightMatrices().size();
+
 		for (uint32_t index{}; index < m_FramesInFlight; ++index)
 		{
-			m_LightSSBOs.emplace_back(builder.Build(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, sizeof(Light)));
+			m_LightSSBOs.emplace_back(builder.Build(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+													, lightCount * sizeof(Light)));
+			m_LightMatricesSSBOs.emplace_back(builder.Build(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+															, lightMatricesCount * sizeof(glm::mat4)));
+
 			m_LightSSBOs[index].UpdateData(m_Scene->GetLights());
+			m_LightMatricesSSBOs[index].UpdateData(m_Scene->GetLightMatrices());
 			help::NameObject(m_Context
 							 , reinterpret_cast<uint64_t>(static_cast<VkBuffer>(m_LightSSBOs[index]))
 							 , VK_OBJECT_TYPE_BUFFER
 							 , "Light SSBO");
+			help::NameObject(m_Context
+							 , reinterpret_cast<uint64_t>(static_cast<VkBuffer>(m_LightMatricesSSBOs[index]))
+							 , VK_OBJECT_TYPE_BUFFER
+							 , "Light matrices SSBO");
 		}
 	}
 	CreateDepth();

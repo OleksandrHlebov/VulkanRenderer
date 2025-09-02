@@ -23,13 +23,21 @@ struct Light
 {
     vec4 position;
     vec4 colour;
+    uint matrixIndex;
 };
 
-layout(constant_id = 0) const uint LIGHT_COUNT = 1u;
+layout(constant_id = 0) const uint LIGHT_COUNT = 2u;
+layout(constant_id = 1) const uint DIRECTIONAL_LIGHT_COUNT = 1u;
 layout(std430, set = 1, binding = 4) readonly buffer LightsSSBO
 {
     Light lights[LIGHT_COUNT];
 };
+layout(std430, set = 1, binding = 5) readonly buffer LightMatricesSSBO
+{
+    mat4 matrices[DIRECTIONAL_LIGHT_COUNT];
+};
+layout(set = 1, binding = 6) uniform sampler shadowSampler;
+layout(set = 1, binding = 7) uniform texture2D directionalShadowMaps[DIRECTIONAL_LIGHT_COUNT];
 
 float DistributionGGX(vec3 N, vec3 H, float a)
 {
@@ -139,8 +147,14 @@ void main()
         const vec3 kS = F;
         const vec3 kD = (vec3(1.f) - kS) * (1.f - metalness);
 
+        const uint matrixIndex = min(lights[lightIndex].matrixIndex, DIRECTIONAL_LIGHT_COUNT - 1);
+        vec4 lightSpacePosition = matrices[matrixIndex] * vec4(worldPosition, 1.f);
+        lightSpacePosition /= lightSpacePosition.w;
+        const vec3 shadowMapUV = vec3(lightSpacePosition.xy * .5f + .5f, lightSpacePosition.z);
+        const float shadow = isDirectional * texture(sampler2DShadow(directionalShadowMaps[matrixIndex], shadowSampler), shadowMapUV) + isPoint * 1.f;
+
         float NdotL = max(dot(normal, lightDirection), .0f);
-        Lo += (kD * albedoColour.rgb / PI + specular) * irradiance * NdotL;
+        Lo += shadow * (kD * albedoColour.rgb / PI + specular) * irradiance * NdotL;
     }
 
     vec3 ambient = vec3(.03f) * albedoColour.rgb;
