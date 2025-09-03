@@ -491,7 +491,7 @@ void App::GenerateShadowMaps()
 		if (m_Context.DispatchTable.waitForFences(1, &commandBuffer.GetFence(), VK_TRUE, UINT64_MAX) != VK_SUCCESS)
 			throw std::runtime_error("failed to wait for command buffer fence");
 
-		for (int index{}; index < directionalShadowMaps.size(); ++index)
+		for (uint32_t index{}; index < directionalShadowMaps.size(); ++index)
 		{
 			uint32_t const textureIndex = m_Scene->AddTextureToPool(std::move(directionalShadowMaps[index])
 																	, std::move(directionalShadowMapViews[index]));
@@ -521,7 +521,7 @@ void App::GenerateShadowMaps()
 				imageInfos.emplace_back(VK_NULL_HANDLE, *view, image->GetLayout());
 			}
 
-			for (int index{}; index < m_GlobalDescriptorSets.size(); ++index)
+			for (uint32_t index{}; index < m_GlobalDescriptorSets.size(); ++index)
 			{
 				m_GlobalDescriptorSets[index]
 					.AddWriteDescriptor(imageInfos
