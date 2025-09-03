@@ -113,24 +113,24 @@ glm::mat4 Scene::CalculateLightSpaceMatrix(glm::vec3 const& direction) const
 	return projection * view;
 }
 
-void Scene::AddLight(Light&& light)
+void Scene::AddLight(Light light)
 {
-	m_LightData.Lights.emplace_back(light);
-	if (!light.IsPoint())
+	m_LightData.Lights.emplace_back(std::move(light));
+	if (!m_LightData.Lights.back().IsPoint())
 	{
 		m_LightData.LightSpaceMatrices.emplace_back(CalculateLightSpaceMatrix(light.m_Position));
-		m_LightData.Lights.back().m_MatrixIndex = static_cast<uint32_t>(m_LightData.LightSpaceMatrices.size() - 1);
+		m_LightData.Lights.back().m_Index = static_cast<uint32_t>(m_LightData.LightSpaceMatrices.size() - 1);
 	}
-}
-
-void Scene::AddLight(Light const& light)
-{
-	m_LightData.Lights.emplace_back(light);
-	if (!light.IsPoint())
+	else
 	{
-		m_LightData.LightSpaceMatrices.emplace_back(CalculateLightSpaceMatrix(light.m_Position));
-		m_LightData.Lights.back().m_MatrixIndex = static_cast<uint32_t>(m_LightData.LightSpaceMatrices.size() - 1);
+		static uint32_t pointLightCount   = 0;
+		m_LightData.Lights.back().m_Index = pointLightCount++;
 	}
+	std::ranges::sort(m_LightData.Lights
+					  , [](auto& l, auto& r)
+					  {
+						  return l.GetIndex() < r.GetIndex() && l.GetPosition().w < r.GetPosition().w;
+					  });
 }
 
 void Scene::AddLight(glm::vec3 const& position, bool isPoint, glm::vec3 const& colour, float intensity)

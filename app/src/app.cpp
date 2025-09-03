@@ -146,8 +146,13 @@ void App::CreateDevice()
 	VkPhysicalDeviceVulkan11Features features11{};
 	features11.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
 	VkPhysicalDeviceVulkan12Features features12{};
-	features12.sType                                     = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
-	features12.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+	features12.sType                                        = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+	features12.runtimeDescriptorArray                       = VK_TRUE;
+	features12.descriptorBindingPartiallyBound              = VK_TRUE;
+	features12.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
+	features12.descriptorBindingVariableDescriptorCount     = VK_TRUE;
+	features12.descriptorIndexing                           = VK_TRUE;
+	features12.shaderSampledImageArrayNonUniformIndexing    = VK_TRUE;
 	VkPhysicalDeviceVulkan13Features features13{};
 	features13.sType            = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
 	features13.dynamicRendering = VK_TRUE;
@@ -274,7 +279,10 @@ void App::CreateDescriptorSetLayouts()
 										  .AddBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT)
 										  .AddBinding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT)
 										  .AddBinding(6, VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
-										  .AddBinding(7, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
+										  .AddBinding(7
+													  , VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
+													  , VK_SHADER_STAGE_FRAGMENT_BIT
+													  , std::max(m_Scene->GetDirectionalLightCount(), 1u))
 										  .Build();
 
 		m_FrameDescSetLayout = std::make_unique<vkc::DescriptorSetLayout>(std::move(layout));
@@ -315,11 +323,6 @@ void App::CreateDescriptorSetLayouts()
 
 void App::GenerateShadowMaps()
 {
-	std::ranges::sort(m_Scene->GetLights()
-					  , [](auto& l, auto& r)
-					  {
-						  return l.GetMatrixIndex() < r.GetMatrixIndex();
-					  });
 	//
 	{
 		size_t const directionalLightCount =
@@ -430,7 +433,7 @@ void App::GenerateShadowMaps()
 														  , 0
 														  , nullptr);
 
-			glm::mat4 const lightSpace = m_Scene->GetLightMatrices()[m_Scene->GetLights()[index].GetMatrixIndex()];
+			glm::mat4 const lightSpace = m_Scene->GetLightMatrices()[m_Scene->GetLights()[index].GetIndex()];
 			m_Context.DispatchTable.cmdPushConstants(commandBuffer
 													 , pipelineLayout
 													 , VK_SHADER_STAGE_VERTEX_BIT
@@ -527,7 +530,8 @@ void App::CreateDescriptorSets()
 		std::vector<VkDescriptorSetLayout> layouts(m_FramesInFlight, *m_FrameDescSetLayout);
 
 		vkc::DescriptorSetBuilder const builder{ m_Context };
-		m_FrameDescriptorSets = builder.Build(*m_DescPool, layouts);
+		m_FrameDescriptorSets = builder
+			.Build(*m_DescPool, layouts);
 
 		for (uint32_t index{}; index < m_FramesInFlight; ++index)
 		{
@@ -722,8 +726,12 @@ void App::CreateGraphicsPipeline()
 		vkc::ShaderStage quad{ m_Context, help::ReadFile("shaders/quad.spv"), VK_SHADER_STAGE_VERTEX_BIT };
 		vkc::ShaderStage lighting{ m_Context, help::ReadFile("shaders/lighting.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
 		lighting.AddSpecializationConstant(static_cast<uint32_t>(m_Scene->GetLights().size()));
-		if (!m_Scene->GetLightMatrices().empty())
-			lighting.AddSpecializationConstant(static_cast<uint32_t>(m_Scene->GetLightMatrices().size()));
+		VkBool32 const hasDirectionalLights = m_Scene->GetDirectionalLightCount() > 0 ? VK_TRUE : VK_FALSE;
+		VkBool32 const hasPointLights       = m_Scene->GetPointLightCount() > 0 ? VK_TRUE : VK_FALSE;
+		lighting.AddSpecializationConstant(std::max(m_Scene->GetDirectionalLightCount(), 1u));
+		lighting.AddSpecializationConstant(m_Scene->GetPointLightCount());
+		lighting.AddSpecializationConstant(hasDirectionalLights & m_Config.EnableDirectionalLights);
+		lighting.AddSpecializationConstant(hasPointLights & m_Config.EnableDirectionalLights);
 
 		VkFormat colorAttachmentFormats[]{ m_Context.Swapchain.image_format };
 
@@ -757,8 +765,11 @@ void App::CreateScene()
 {
 	m_Scene = std::make_unique<Scene>(m_Context, *m_CommandPool);
 	m_Scene->Load("data/glTF/Sponza.gltf");
-	m_Scene->AddLight({ .877f, .877f, .577f }, false, { .877f, .653f, .333f }, 100.f);
-	m_Scene->AddLight({ -4.f, 1.f, .0f }, true, { 1.f, .0f, .0f }, 100.f);
+	// m_Scene->AddLight(-glm::normalize(glm::vec3{ 0.577f, -0.577f, -0.577f }), false, { .877f, .877f, .577f }, 100.f);
+	// m_Scene->AddLight(-glm::normalize(glm::vec3{ .999f, -.577f, .0f }), false, { .877f, .877f, .3f }, 50.f);
+	m_Scene->AddLight({ -2.f, 1.f, .0f }, true, { 1.f, .0f, .0f }, 75.f);
+	m_Scene->AddLight({ -6.f, 1.f, .0f }, true, { .0f, 1.f, .0f }, 75.f);
+	m_Scene->AddLight({ 2.f, 1.f, .0f }, true, { .666f, .533f, .12f }, 75.f);
 	std::cout << (m_Scene->ContainsPBRInfo() ? "scene contains pbr info" : "scene does not contain pbr info") << std::endl;
 }
 

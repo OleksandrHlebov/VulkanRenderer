@@ -66,8 +66,17 @@ public:
 
 	[[nodiscard]] glm::mat4 CalculateLightSpaceMatrix(glm::vec3 const& direction) const;
 
-	void AddLight(Light&& light);
-	void AddLight(Light const& light);
+	[[nodiscard]] uint32_t GetDirectionalLightCount() const
+	{
+		return static_cast<uint32_t>(m_LightData.LightSpaceMatrices.size());
+	}
+
+	[[nodiscard]] uint32_t GetPointLightCount() const
+	{
+		return static_cast<uint32_t>(m_LightData.Lights.size() - m_LightData.LightSpaceMatrices.size());
+	}
+
+	void AddLight(Light light);
 	void AddLight(glm::vec3 const& position, bool isPoint, glm::vec3 const& colour, float intensity);
 
 private:

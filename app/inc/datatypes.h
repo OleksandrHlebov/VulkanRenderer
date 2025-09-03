@@ -20,6 +20,12 @@ struct TextureIndices
 	uint32_t Roughness;
 };
 
+struct Config
+{
+	VkBool32 EnableDirectionalLights{ VK_TRUE };
+	VkBool32 EnablePointLights{ VK_TRUE };
+};
+
 class Light
 {
 public:
@@ -38,9 +44,9 @@ public:
 		return m_Position;
 	}
 
-	[[nodiscard]] uint32_t GetMatrixIndex() const
+	[[nodiscard]] uint32_t GetIndex() const
 	{
-		return m_MatrixIndex;
+		return m_Index;
 	}
 
 private:
@@ -48,7 +54,7 @@ private:
 	glm::vec4           m_Position;
 	glm::vec3           m_Colour;
 	float               m_Intensity;
-	alignas(16)uint32_t m_MatrixIndex{ UINT32_MAX };
+	alignas(16)uint32_t m_Index{ UINT32_MAX };
 };
 
 struct LightData

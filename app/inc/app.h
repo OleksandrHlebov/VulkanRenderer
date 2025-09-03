@@ -5,6 +5,7 @@
 #include "buffer.h"
 #include "context.h"
 #include "camera.h"
+#include "datatypes.h"
 #include "pipeline.h"
 #include "descriptor_set.h"
 #include "descriptor_pool.h"
@@ -64,6 +65,8 @@ private:
 	void DoLightingPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex);
 	void DoGBufferPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex) const;
 	void DoDepthPrepass(vkc::CommandBuffer const& commandBuffer, size_t imageIndex) const;
+
+	Config m_Config;
 
 	uptr<Camera> m_Camera;
 	vkc::Context m_Context{};
