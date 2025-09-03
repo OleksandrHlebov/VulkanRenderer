@@ -340,7 +340,7 @@ void App::GenerateShadowMaps()
 			.SetType(VK_IMAGE_TYPE_2D)
 			.SetExtent(shadowMapResolution);
 
-		for (int index{}; index < directionalLightCount; ++index)
+		for (uint32_t index{}; index < directionalLightCount; ++index)
 		{
 			m_DirectionalShadowMaps.emplace_back(builder.Build(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT));
 			m_DirectionalShadowMapViews.emplace_back(m_DirectionalShadowMaps[index].CreateView(m_Context, VK_IMAGE_VIEW_TYPE_2D));
@@ -388,7 +388,7 @@ void App::GenerateShadowMaps()
 		vkc::CommandBuffer& commandBuffer = m_CommandPool->AllocateCommandBuffer(m_Context);
 		commandBuffer.Begin(m_Context, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
-		for (int index{}; index < m_DirectionalShadowMaps.size(); ++index)
+		for (uint32_t index{}; index < m_DirectionalShadowMaps.size(); ++index)
 		{
 			auto& shadowMap  = m_DirectionalShadowMaps[index];
 			auto& shadowView = m_DirectionalShadowMapViews[index];
