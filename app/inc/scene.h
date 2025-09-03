@@ -32,7 +32,7 @@ public:
 	[[nodiscard]] bool ContainsPBRInfo() const
 	{
 		return m_ContainsPBRInfo;
-	};
+	}
 
 	[[nodiscard]] std::list<Mesh> const& GetMeshes() const
 	{

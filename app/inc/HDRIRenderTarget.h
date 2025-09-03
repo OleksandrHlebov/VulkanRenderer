@@ -19,7 +19,7 @@ public:
 
 	vkc::ImageView& AcquireNextImageView();
 
-	bool HasBeenRenderedTo() const
+	[[nodiscard]] bool HasBeenRenderedTo() const
 	{
 		return m_ImageIndex >= 0;
 	}

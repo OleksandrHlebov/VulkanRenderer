@@ -5,7 +5,6 @@
 
 #include "buffer.h"
 #include "datatypes.h"
-#include "glm/glm.hpp"
 
 class Mesh final
 {
