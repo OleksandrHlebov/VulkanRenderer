@@ -76,6 +76,8 @@ public:
 		return static_cast<uint32_t>(m_LightData.Lights.size() - m_LightData.LightSpaceMatrices.size());
 	}
 
+	[[nodiscard]] uint32_t AddTextureToPool(vkc::Image&& image, vkc::ImageView&& imageView);
+
 	void AddLight(Light light);
 	void AddLight(glm::vec3 const& position, bool isPoint, glm::vec3 const& colour, float intensity);
 

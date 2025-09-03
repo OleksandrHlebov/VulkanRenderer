@@ -48,6 +48,8 @@ private:
 	void CreateSwapchain();
 	void CreateSyncObjects();
 	void CreateDescriptorPool();
+	void UpdateGbufferDescriptor();
+	void CreateFrameDescriptorSet();
 	void CreateDescriptorSets();
 	void CreateGraphicsPipeline();
 	void CreateCmdPool();
@@ -75,6 +77,7 @@ private:
 
 	uptr<vkc::DescriptorSetLayout> m_FrameDescSetLayout{};
 	uptr<vkc::DescriptorSetLayout> m_GlobalDescSetLayout{};
+	uptr<vkc::DescriptorSetLayout> m_GbufferDescSetLayout{};
 	uptr<vkc::DescriptorPool>      m_DescPool{};
 
 	uptr<vkc::PipelineLayout> m_DepthPrepPipelineLayout;
@@ -102,9 +105,6 @@ private:
 	std::vector<vkc::Image>     m_SwapchainImages;
 	std::vector<vkc::ImageView> m_SwapchainImageViews;
 
-	std::vector<vkc::Image>     m_DirectionalShadowMaps;
-	std::vector<vkc::ImageView> m_DirectionalShadowMapViews;
-
 	uptr<vkc::CommandPool> m_CommandPool{};
 
 	std::vector<vkc::Buffer> m_MVPUBOs{};
@@ -113,6 +113,7 @@ private:
 
 	std::vector<vkc::DescriptorSet> m_FrameDescriptorSets{};
 	std::vector<vkc::DescriptorSet> m_GlobalDescriptorSets{};
+	std::vector<vkc::DescriptorSet> m_GbufferDescriptorSets{};
 
 	std::vector<VkSemaphore> m_ImageAvailableSemaphores{};
 	std::vector<VkSemaphore> m_RenderFinishedSemaphores{};

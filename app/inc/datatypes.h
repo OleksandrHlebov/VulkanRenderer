@@ -44,9 +44,19 @@ public:
 		return m_Position;
 	}
 
-	[[nodiscard]] uint32_t GetIndex() const
+	[[nodiscard]] uint32_t GetMatrixIndex() const
 	{
-		return m_Index;
+		return m_MatrixIndex;
+	}
+
+	[[nodiscard]] uint32_t GetShadowMapIndex() const
+	{
+		return m_ShadowMapIndex;
+	}
+
+	void LinkShadowMapIndex(uint32_t shadowMapIndex)
+	{
+		m_ShadowMapIndex = shadowMapIndex;
 	}
 
 private:
@@ -54,7 +64,8 @@ private:
 	glm::vec4           m_Position;
 	glm::vec3           m_Colour;
 	float               m_Intensity;
-	alignas(16)uint32_t m_Index{ UINT32_MAX };
+	alignas(16)uint32_t m_ShadowMapIndex{ UINT32_MAX };
+	uint32_t            m_MatrixIndex{ UINT32_MAX };
 };
 
 struct LightData

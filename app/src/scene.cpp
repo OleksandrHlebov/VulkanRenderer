@@ -113,23 +113,32 @@ glm::mat4 Scene::CalculateLightSpaceMatrix(glm::vec3 const& direction) const
 	return projection * view;
 }
 
+uint32_t Scene::AddTextureToPool(vkc::Image&& image, vkc::ImageView&& imageView)
+{
+	m_TextureImages.emplace_back(std::move(image));
+	m_TextureImageViews.emplace_back(std::move(imageView));
+	return static_cast<uint32_t>(m_TextureImageViews.size() - 1);
+}
+
 void Scene::AddLight(Light light)
 {
-	m_LightData.Lights.emplace_back(std::move(light));
+	m_LightData.Lights.emplace_back(light);
 	if (!m_LightData.Lights.back().IsPoint())
 	{
 		m_LightData.LightSpaceMatrices.emplace_back(CalculateLightSpaceMatrix(light.m_Position));
-		m_LightData.Lights.back().m_Index = static_cast<uint32_t>(m_LightData.LightSpaceMatrices.size() - 1);
+		m_LightData.Lights.back().m_MatrixIndex = static_cast<uint32_t>(m_LightData.LightSpaceMatrices.size() - 1);
 	}
 	else
 	{
-		static uint32_t pointLightCount   = 0;
-		m_LightData.Lights.back().m_Index = pointLightCount++;
+		static uint32_t pointLightCount         = 0;
+		m_LightData.Lights.back().m_MatrixIndex = pointLightCount++;
 	}
 	std::ranges::sort(m_LightData.Lights
 					  , [](auto& l, auto& r)
 					  {
-						  return l.GetIndex() < r.GetIndex() && l.GetPosition().w < r.GetPosition().w;
+						  return l.GetMatrixIndex() < r.GetMatrixIndex() && l.GetPosition().w < r.GetPosition().w
+							  // && l.GetShadowMapIndex() < r.GetShadowMapIndex()
+							  ;
 					  });
 }
 

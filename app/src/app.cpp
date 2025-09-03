@@ -273,29 +273,35 @@ void App::CreateDescriptorSetLayouts()
 										  .AddBinding(0
 													  , VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
 													  , VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
-										  .AddBinding(1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
-										  .AddBinding(2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
-										  .AddBinding(3, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
-										  .AddBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT)
-										  .AddBinding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT)
-										  .AddBinding(6, VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
-										  .AddBinding(7
-													  , VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
-													  , VK_SHADER_STAGE_FRAGMENT_BIT
-													  , std::max(m_Scene->GetDirectionalLightCount(), 1u))
+										  .AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT)
+										  .AddBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT)
+										  .AddBinding(3, VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
 										  .Build();
 
 		m_FrameDescSetLayout = std::make_unique<vkc::DescriptorSetLayout>(std::move(layout));
 	}
 	//
 	{
+		vkc::DescriptorSetLayoutBuilder builder{ m_Context };
+		vkc::DescriptorSetLayout        layout = builder
+										  .AddBinding(0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
+										  .AddBinding(1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
+										  .AddBinding(2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
+										  .Build();
+
+		m_GbufferDescSetLayout = std::make_unique<vkc::DescriptorSetLayout>(std::move(layout));
+	}
+	//
+	{
 		VkSamplerCreateInfo samplerCreateInfo{};
-		samplerCreateInfo.sType        = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-		samplerCreateInfo.minFilter    = VK_FILTER_LINEAR;
-		samplerCreateInfo.magFilter    = VK_FILTER_LINEAR;
-		samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		samplerCreateInfo.sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		samplerCreateInfo.minFilter               = VK_FILTER_LINEAR;
+		samplerCreateInfo.magFilter               = VK_FILTER_LINEAR;
+		samplerCreateInfo.addressModeU            = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		samplerCreateInfo.addressModeV            = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		samplerCreateInfo.addressModeW            = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
+		samplerCreateInfo.compareEnable           = VK_FALSE;
 
 		m_Context.DispatchTable.createSampler(&samplerCreateInfo, nullptr, &m_TextureSampler);
 
@@ -309,32 +315,31 @@ void App::CreateDescriptorSetLayouts()
 			m_Context.DispatchTable.destroySampler(m_ShadowSampler, nullptr);
 		});
 
+		uint32_t constexpr variableTextureCount{ 1024 };
+
 		vkc::DescriptorSetLayoutBuilder builder{ m_Context };
 		vkc::DescriptorSetLayout        layout = builder
 										  .AddBinding(0, VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
 										  .AddBinding(1
 													  , VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
 													  , VK_SHADER_STAGE_FRAGMENT_BIT
-													  , static_cast<uint32_t>(m_Scene->GetTextureImages().size()))
+													  , variableTextureCount
+													  , VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT
+														| VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT)
 										  .Build();
 		m_GlobalDescSetLayout = std::make_unique<vkc::DescriptorSetLayout>(std::move(layout));
+		help::NameObject(m_Context
+						 , reinterpret_cast<uint64_t>(static_cast<VkDescriptorSetLayout>(*m_GlobalDescSetLayout))
+						 , VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT
+						 , "global descriptor set layout");
 	}
 }
 
 void App::GenerateShadowMaps()
 {
 	//
+	if (m_Scene->GetDirectionalLightCount() > 0)
 	{
-		size_t const directionalLightCount =
-			std::ranges::count_if(m_Scene->GetLights()
-								  , [](auto& light)
-								  {
-									  return light.GetPosition().w == .0f;
-								  });
-
-		if (directionalLightCount == 0)
-			return;
-
 		constexpr VkExtent2D shadowMapResolution{ 1024, 1024 };
 		vkc::ImageBuilder    builder{ m_Context };
 		builder
@@ -342,18 +347,20 @@ void App::GenerateShadowMaps()
 			.SetFormat(m_DepthImage->GetFormat())
 			.SetType(VK_IMAGE_TYPE_2D)
 			.SetExtent(shadowMapResolution);
+		std::vector<vkc::Image>     directionalShadowMaps;
+		std::vector<vkc::ImageView> directionalShadowMapViews;
 
-		for (uint32_t index{}; index < directionalLightCount; ++index)
+		for (uint32_t index{}; index < m_Scene->GetDirectionalLightCount(); ++index)
 		{
-			m_DirectionalShadowMaps.emplace_back(builder.Build(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT));
-			m_DirectionalShadowMapViews.emplace_back(m_DirectionalShadowMaps[index].CreateView(m_Context, VK_IMAGE_VIEW_TYPE_2D));
+			directionalShadowMaps.emplace_back(builder.Build(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT));
+			directionalShadowMapViews.emplace_back(directionalShadowMaps[index].CreateView(m_Context, VK_IMAGE_VIEW_TYPE_2D));
 
 			help::NameObject(m_Context
-							 , reinterpret_cast<uint64_t>(static_cast<VkImage>(m_DirectionalShadowMaps[index]))
+							 , reinterpret_cast<uint64_t>(static_cast<VkImage>(directionalShadowMaps[index]))
 							 , VK_OBJECT_TYPE_IMAGE
 							 , "Directional shadow map");
 			help::NameObject(m_Context
-							 , reinterpret_cast<uint64_t>(static_cast<VkImageView>(m_DirectionalShadowMapViews[index]))
+							 , reinterpret_cast<uint64_t>(static_cast<VkImageView>(directionalShadowMapViews[index]))
 							 , VK_OBJECT_TYPE_IMAGE_VIEW
 							 , "Directional shadow map view");
 		}
@@ -391,13 +398,13 @@ void App::GenerateShadowMaps()
 		vkc::CommandBuffer& commandBuffer = m_CommandPool->AllocateCommandBuffer(m_Context);
 		commandBuffer.Begin(m_Context, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
-		for (uint32_t index{}; index < m_DirectionalShadowMaps.size(); ++index)
+		for (uint32_t index{}; index < directionalShadowMaps.size(); ++index)
 		{
-			auto& shadowMap  = m_DirectionalShadowMaps[index];
-			auto& shadowView = m_DirectionalShadowMapViews[index];
+			auto& shadowMap  = directionalShadowMaps[index];
+			auto& shadowView = directionalShadowMapViews[index];
 			// transition to depth attachment optimal
 			{
-				vkc::Image::Transition transition{ m_DirectionalShadowMapViews[index] };
+				vkc::Image::Transition transition{ directionalShadowMapViews[index] };
 				transition.NewLayout     = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
 				transition.SrcAccessMask = VK_ACCESS_NONE;
 				transition.DstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
@@ -433,7 +440,7 @@ void App::GenerateShadowMaps()
 														  , 0
 														  , nullptr);
 
-			glm::mat4 const lightSpace = m_Scene->GetLightMatrices()[m_Scene->GetLights()[index].GetIndex()];
+			glm::mat4 const lightSpace = m_Scene->GetLightMatrices()[m_Scene->GetLights()[index].GetMatrixIndex()];
 			m_Context.DispatchTable.cmdPushConstants(commandBuffer
 													 , pipelineLayout
 													 , VK_SHADER_STAGE_VERTEX_BIT
@@ -470,7 +477,7 @@ void App::GenerateShadowMaps()
 			//
 			{
 				vkc::Image::Transition transition{ shadowView };
-				transition.NewLayout     = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+				transition.NewLayout     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 				transition.SrcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 				transition.DstAccessMask = VK_ACCESS_NONE;
 				transition.SrcStageMask  = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
@@ -483,25 +490,53 @@ void App::GenerateShadowMaps()
 		commandBuffer.Submit(m_Context, m_Context.GraphicsQueue, {}, {});
 		if (m_Context.DispatchTable.waitForFences(1, &commandBuffer.GetFence(), VK_TRUE, UINT64_MAX) != VK_SUCCESS)
 			throw std::runtime_error("failed to wait for command buffer fence");
+
+		for (int index{}; index < directionalShadowMaps.size(); ++index)
+		{
+			uint32_t const textureIndex = m_Scene->AddTextureToPool(std::move(directionalShadowMaps[index])
+																	, std::move(directionalShadowMapViews[index]));
+			m_Scene->GetLights()[index].LinkShadowMapIndex(textureIndex);
+		}
+		directionalShadowMaps.clear();
+		directionalShadowMapViews.clear();
+
 		pipeline.Destroy(m_Context);
 		pipelineLayout.Destroy(m_Context);
-
-		std::vector<VkDescriptorImageInfo> imageInfos;
-		imageInfos.reserve(m_Scene->GetLightMatrices().size());
-
-		for (auto [image, view]{ std::make_pair(m_DirectionalShadowMaps.begin(), m_DirectionalShadowMapViews.begin()) };
-			 image != m_DirectionalShadowMaps.end() && view != m_DirectionalShadowMapViews.end();
-			 ++image, ++view)
+		//
 		{
-			imageInfos.emplace_back(VK_NULL_HANDLE, *view, image->GetLayout());
-		}
-		for (auto& descriptorSet: m_FrameDescriptorSets)
-		{
-			descriptorSet
-				.AddWriteDescriptor(imageInfos, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 7, 0)
-				.Update(m_Context);
+			auto const& textures     = m_Scene->GetTextureImages();
+			auto const& textureViews = m_Scene->GetTextureImageViews();
+
+			std::vector<VkDescriptorImageInfo> imageInfos;
+			imageInfos.reserve(textures.size());
+
+			const size_t textureCountWithoutShadowMaps = textures.size() - m_Scene->GetDirectionalLightCount();
+
+			for (auto [image, view]{
+					 std::make_pair(textures.begin() + textureCountWithoutShadowMaps, textureViews.begin() + textureCountWithoutShadowMaps)
+				 };
+				 image != textures.end() && view != textureViews.end();
+				 ++image, ++view)
+			{
+				imageInfos.emplace_back(VK_NULL_HANDLE, *view, image->GetLayout());
+			}
+
+			for (int index{}; index < m_GlobalDescriptorSets.size(); ++index)
+			{
+				m_GlobalDescriptorSets[index]
+					.AddWriteDescriptor(imageInfos
+										, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
+										, 1
+										, static_cast<uint32_t>(textureCountWithoutShadowMaps))
+					.Update(m_Context);
+			}
 		}
 	}
+
+	for (auto& ssbo: m_LightMatricesSSBOs)
+		ssbo.UpdateData(m_Scene->GetLightMatrices());
+	for (auto& ssbo: m_LightSSBOs)
+		ssbo.UpdateData(m_Scene->GetLights());
 }
 
 void App::CreateDescriptorPool()
@@ -518,9 +553,36 @@ void App::CreateDescriptorPool()
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)  // normals and material
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)  // depth
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)  // shadow maps
-							   .Build(2 * m_FramesInFlight);
+							   .Build(3 * m_FramesInFlight);
 
 	m_DescPool = std::make_unique<vkc::DescriptorPool>(std::move(pool));
+}
+
+void App::UpdateGbufferDescriptor()
+{
+	for (uint32_t index{}; index < m_FramesInFlight; ++index)
+	{
+		VkDescriptorImageInfo albedoInfo{};
+		albedoInfo.sampler     = VK_NULL_HANDLE;
+		albedoInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		albedoInfo.imageView   = *m_AlbedoView;
+
+		VkDescriptorImageInfo normalsInfo{};
+		normalsInfo.sampler     = VK_NULL_HANDLE;
+		normalsInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		normalsInfo.imageView   = *m_MaterialView;
+
+		VkDescriptorImageInfo depthInfo{};
+		depthInfo.sampler     = VK_NULL_HANDLE;
+		depthInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		depthInfo.imageView   = *m_DepthImageView;
+
+		m_GbufferDescriptorSets[index]
+			.AddWriteDescriptor({ &albedoInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 0, 0)
+			.AddWriteDescriptor({ &normalsInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, 0)
+			.AddWriteDescriptor({ &depthInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 2, 0)
+			.Update(m_Context);
+	}
 }
 
 void App::CreateDescriptorSets()
@@ -540,34 +602,19 @@ void App::CreateDescriptorSets()
 			bufferInfo.range  = VK_WHOLE_SIZE;
 			bufferInfo.offset = 0;
 
-			VkDescriptorImageInfo albedoInfo{};
-			albedoInfo.sampler     = VK_NULL_HANDLE;
-			albedoInfo.imageLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
-			albedoInfo.imageView   = *m_AlbedoView;
-
-			VkDescriptorImageInfo normalsInfo{};
-			normalsInfo.sampler     = VK_NULL_HANDLE;
-			normalsInfo.imageLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
-			normalsInfo.imageView   = *m_MaterialView;
-
-			VkDescriptorImageInfo depthInfo{};
-			depthInfo.sampler     = VK_NULL_HANDLE;
-			depthInfo.imageLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
-			depthInfo.imageView   = *m_DepthImageView;
-
 			VkDescriptorBufferInfo lightInfo{};
 			lightInfo.buffer = m_LightSSBOs[index];
 			lightInfo.range  = VK_WHOLE_SIZE;
 			lightInfo.offset = 0;
 
+			VkDescriptorBufferInfo lightMatricesInfo{};
 			if (!m_LightMatricesSSBOs.empty())
 			{
-				VkDescriptorBufferInfo lightMatricesInfo{};
 				lightMatricesInfo.buffer = m_LightMatricesSSBOs[index];
 				lightMatricesInfo.range  = VK_WHOLE_SIZE;
 				lightMatricesInfo.offset = 0;
 				m_FrameDescriptorSets[index]
-					.AddWriteDescriptor({ &lightMatricesInfo, 1 }, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 5, 0);
+					.AddWriteDescriptor({ &lightMatricesInfo, 1 }, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2, 0);
 			}
 
 			VkDescriptorImageInfo shadowSamplerInfo{};
@@ -577,13 +624,20 @@ void App::CreateDescriptorSets()
 
 			m_FrameDescriptorSets[index]
 				.AddWriteDescriptor({ &bufferInfo, 1 }, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, 0)
-				.AddWriteDescriptor({ &albedoInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, 0)
-				.AddWriteDescriptor({ &normalsInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 2, 0)
-				.AddWriteDescriptor({ &depthInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 3, 0)
-				.AddWriteDescriptor({ &lightInfo, 1 }, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4, 0)
-				.AddWriteDescriptor({ &shadowSamplerInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLER, 6, 0)
+				.AddWriteDescriptor({ &lightInfo, 1 }, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, 0)
+				.AddWriteDescriptor({ &shadowSamplerInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLER, 3, 0)
 				.Update(m_Context);
 		}
+	}
+	//
+	{
+		std::vector<VkDescriptorSetLayout> layouts(m_FramesInFlight, *m_GbufferDescSetLayout);
+
+		vkc::DescriptorSetBuilder const builder{ m_Context };
+		m_GbufferDescriptorSets = builder
+			.Build(*m_DescPool, layouts);
+
+		UpdateGbufferDescriptor();
 	}
 	//
 	{
@@ -611,8 +665,12 @@ void App::CreateDescriptorSets()
 			imageInfos.emplace_back(VK_NULL_HANDLE, *view, image->GetLayout());
 		}
 
-		vkc::DescriptorSetBuilder const builder{ m_Context };
-		m_GlobalDescriptorSets = builder.Build(*m_DescPool, layouts);
+		std::vector counts(m_FramesInFlight, 1024u);
+
+		vkc::DescriptorSetBuilder builder{ m_Context };
+		m_GlobalDescriptorSets = builder
+								 .AddVariableDescriptorCount(counts)
+								 .Build(*m_DescPool, layouts);
 
 		for (auto& descriptor: m_GlobalDescriptorSets)
 			descriptor
@@ -653,6 +711,7 @@ void App::CreateGraphicsPipeline()
 		vkc::PipelineLayout        layout = builder
 									 .AddDescriptorSetLayout(*m_GlobalDescSetLayout)
 									 .AddDescriptorSetLayout(*m_FrameDescSetLayout)
+									 .AddDescriptorSetLayout(*m_GbufferDescSetLayout)
 									 .Build();
 		m_LightingPipelineLayout = std::make_unique<vkc::PipelineLayout>(std::move(layout));
 		VkDebugUtilsObjectNameInfoEXT debugNameInfo{};
@@ -731,7 +790,7 @@ void App::CreateGraphicsPipeline()
 		lighting.AddSpecializationConstant(std::max(m_Scene->GetDirectionalLightCount(), 1u));
 		lighting.AddSpecializationConstant(m_Scene->GetPointLightCount());
 		lighting.AddSpecializationConstant(hasDirectionalLights & m_Config.EnableDirectionalLights);
-		lighting.AddSpecializationConstant(hasPointLights & m_Config.EnableDirectionalLights);
+		lighting.AddSpecializationConstant(hasPointLights & m_Config.EnablePointLights);
 
 		VkFormat colorAttachmentFormats[]{ m_Context.Swapchain.image_format };
 
@@ -765,8 +824,8 @@ void App::CreateScene()
 {
 	m_Scene = std::make_unique<Scene>(m_Context, *m_CommandPool);
 	m_Scene->Load("data/glTF/Sponza.gltf");
-	// m_Scene->AddLight(-glm::normalize(glm::vec3{ 0.577f, -0.577f, -0.577f }), false, { .877f, .877f, .577f }, 100.f);
-	// m_Scene->AddLight(-glm::normalize(glm::vec3{ .999f, -.577f, .0f }), false, { .877f, .877f, .3f }, 50.f);
+	m_Scene->AddLight(-glm::normalize(glm::vec3{ 0.577f, -0.577f, -0.577f }), false, { .877f, .877f, .577f }, 100.f);
+	m_Scene->AddLight(-glm::normalize(glm::vec3{ .999f, -.577f, .0f }), false, { .877f, .877f, .3f }, 50.f);
 	m_Scene->AddLight({ -2.f, 1.f, .0f }, true, { 1.f, .0f, .0f }, 75.f);
 	m_Scene->AddLight({ -6.f, 1.f, .0f }, true, { .0f, 1.f, .0f }, 75.f);
 	m_Scene->AddLight({ 2.f, 1.f, .0f }, true, { .666f, .533f, .12f }, 75.f);
@@ -891,6 +950,8 @@ void App::RecreateSwapchain()
 	CreateGBuffer();
 	m_Camera->SetNewAspectRatio(static_cast<float>(m_Context.Swapchain.extent.width)
 								/ m_Context.Swapchain.extent.height); // NOLINT(*-narrowing-conversions)
+
+	UpdateGbufferDescriptor();
 }
 
 void App::RecordCommandBuffer(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
@@ -969,11 +1030,11 @@ void App::DoLightingPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
 		vkc::Image::Transition transition{};
 		//
 		{
-			transition.SrcAccessMask = VK_ACCESS_2_NONE;
+			transition.SrcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
 			transition.DstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT;
-			transition.SrcStageMask  = VK_PIPELINE_STAGE_2_NONE;
+			transition.SrcStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
 			transition.DstStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-			transition.NewLayout     = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+			transition.NewLayout     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		}
 		m_AlbedoImage->MakeTransition(m_Context, commandBuffer, transition);
 		m_MaterialImage->MakeTransition(m_Context, commandBuffer, transition);
@@ -1012,7 +1073,11 @@ void App::DoLightingPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
 
 		m_Context.DispatchTable.cmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-		VkDescriptorSet const sets[]{ m_GlobalDescriptorSets[m_CurrentFrame], m_FrameDescriptorSets[m_CurrentFrame] };
+		VkDescriptorSet const sets[]{
+			m_GlobalDescriptorSets[m_CurrentFrame]
+			, m_FrameDescriptorSets[m_CurrentFrame]
+			, m_GbufferDescriptorSets[m_CurrentFrame]
+		};
 
 		m_Context.DispatchTable.cmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *m_LightingPipeline);
 		m_Context.DispatchTable.cmdBindDescriptorSets(commandBuffer
@@ -1058,9 +1123,9 @@ void App::DoGBufferPass(vkc::CommandBuffer& commandBuffer, size_t) const
 		vkc::Image::Transition transition{};
 		//
 		{
-			transition.SrcAccessMask = VK_ACCESS_2_NONE;
+			transition.SrcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 			transition.DstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-			transition.SrcStageMask  = VK_PIPELINE_STAGE_2_NONE;
+			transition.SrcStageMask  = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT;
 			transition.DstStageMask  = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT;
 			transition.NewLayout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		}
@@ -1115,7 +1180,7 @@ void App::DoGBufferPass(vkc::CommandBuffer& commandBuffer, size_t) const
 	depthAttachmentInfo.imageLayout = m_DepthImage->GetLayout();
 	depthAttachmentInfo.imageView   = *m_DepthImageView;
 	depthAttachmentInfo.loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD;
-	depthAttachmentInfo.storeOp     = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	depthAttachmentInfo.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
 
 	VkRenderingInfo renderingInfo{};
 	renderingInfo.sType                = VK_STRUCTURE_TYPE_RENDERING_INFO;

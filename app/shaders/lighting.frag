@@ -7,9 +7,10 @@ layout (location = 0) in vec2 inUV;
 layout (location = 0) out vec4 outColour;
 
 layout (set = 0, binding = 0) uniform sampler samp;
-layout (set = 1, binding = 1) uniform texture2D albedo;
-layout (set = 1, binding = 2) uniform texture2D material;
-layout (set = 1, binding = 3) uniform texture2D depthBuffer;
+layout (set = 0, binding = 1) uniform texture2D textures[];
+layout (set = 2, binding = 0) uniform texture2D albedo;
+layout (set = 2, binding = 1) uniform texture2D material;
+layout (set = 2, binding = 2) uniform texture2D depthBuffer;
 layout (set = 1, binding = 0) uniform ModelViewProjection
 {
     mat4 model;
@@ -23,6 +24,7 @@ struct Light
 {
     vec4 position;
     vec4 colour;
+    uint shadowMapIndex;
     uint matrixIndex;
 };
 
@@ -31,16 +33,15 @@ layout(constant_id = 1) const uint DIRECTIONAL_LIGHT_COUNT = 1u;
 layout(constant_id = 2) const uint POINT_LIGHT_COUNT = 0u;
 layout(constant_id = 3) const bool ENABLE_DIRECTIONAL_LIGHT = true;
 layout(constant_id = 4) const bool ENABLE_POINT_LIGHT = true;
-layout(std430, set = 1, binding = 4) readonly buffer LightsSSBO
+layout(std430, set = 1, binding = 1) readonly buffer LightsSSBO
 {
     Light lights[LIGHT_COUNT];
 };
-layout(std430, set = 1, binding = 5) readonly buffer LightMatricesSSBO
+layout(std430, set = 1, binding = 2) readonly buffer LightMatricesSSBO
 {
     mat4 matrices[DIRECTIONAL_LIGHT_COUNT];
 };
-layout(set = 1, binding = 6) uniform sampler shadowSampler;
-layout(set = 1, binding = 7) uniform texture2D directionalShadowMaps[DIRECTIONAL_LIGHT_COUNT];
+layout(set = 1, binding = 3) uniform sampler shadowSampler;
 
 float DistributionGGX(vec3 N, vec3 H, float a)
 {
@@ -126,6 +127,7 @@ void main()
 {
     const vec4 materialProperties = texelFetch(sampler2D(material, samp), ivec2(inUV * textureSize(material, 0)), 0);
     const vec4 albedoColour = texture(sampler2D(albedo, samp), inUV);
+
     const vec3 normal = Decode(materialProperties.rg);
 
     const float metalness = materialProperties.a;
@@ -148,7 +150,7 @@ void main()
         vec4 lightSpacePosition = matrices[matrixIndex] * vec4(worldPosition, 1.f);
         lightSpacePosition /= lightSpacePosition.w;
         const vec3 shadowMapUV = vec3(lightSpacePosition.xy * .5f + .5f, lightSpacePosition.z);
-        const float shadow = texture(sampler2DShadow(directionalShadowMaps[matrixIndex], shadowSampler), shadowMapUV);
+        const float shadow = texture(sampler2DShadow(textures[lights[lightIndex].shadowMapIndex], shadowSampler), shadowMapUV);
 
         Lo += shadow * CalculateLight(viewDirection, lightDirection, normal, lights[lightIndex].colour.rgb, albedoColour.rgb, roughness, metalness, illuminance);
     }

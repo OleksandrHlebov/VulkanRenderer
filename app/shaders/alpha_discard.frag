@@ -3,10 +3,8 @@
 
 layout (location = 0) in vec2 inUV;
 
-layout (constant_id = 0) const uint TEXTURE_COUNT = 1;
-
 layout (set = 0, binding = 0) uniform sampler samp;
-layout (set = 0, binding = 1) uniform texture2D textures[TEXTURE_COUNT];
+layout (set = 0, binding = 1) uniform texture2D textures[];
 
 layout (push_constant) uniform constants
 {
