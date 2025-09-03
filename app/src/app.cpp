@@ -1024,16 +1024,6 @@ void App::DoLightingPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
 													  , 0
 													  , nullptr);
 
-		VkDeviceSize constexpr offsets[] = { {} };
-
-		m_Context.DispatchTable.cmdBindVertexBuffers(commandBuffer
-													 , 0
-													 , 1
-													 , mesh.GetVertexBuffer()
-													 , offsets);
-
-		m_Context.DispatchTable.cmdBindIndexBuffer(commandBuffer, mesh.GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
-
 		m_Context.DispatchTable.cmdDraw(commandBuffer, 3, 1, 0, 0);
 	}
 	m_Context.DispatchTable.cmdEndRendering(commandBuffer);
