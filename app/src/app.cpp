@@ -1026,19 +1026,15 @@ void App::DoLightingPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
 
 		VkDeviceSize constexpr offsets[] = { {} };
 
-		for (auto const& meshes = m_Scene->GetMeshes();
-			 Mesh const& mesh: meshes)
-		{
-			m_Context.DispatchTable.cmdBindVertexBuffers(commandBuffer
-														 , 0
-														 , 1
-														 , mesh.GetVertexBuffer()
-														 , offsets);
+		m_Context.DispatchTable.cmdBindVertexBuffers(commandBuffer
+													 , 0
+													 , 1
+													 , mesh.GetVertexBuffer()
+													 , offsets);
 
-			m_Context.DispatchTable.cmdBindIndexBuffer(commandBuffer, mesh.GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+		m_Context.DispatchTable.cmdBindIndexBuffer(commandBuffer, mesh.GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
-			m_Context.DispatchTable.cmdDraw(commandBuffer, 3, 1, 0, 0);
-		}
+		m_Context.DispatchTable.cmdDraw(commandBuffer, 3, 1, 0, 0);
 	}
 	m_Context.DispatchTable.cmdEndRendering(commandBuffer);
 
