@@ -55,13 +55,13 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 	                   "${ASSIMP_DLL}"
 	                   "${CMAKE_BINARY_DIR}/"
 	                   )
-	#	#elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-	#	#	set(ASSIMP_DLL "${assimp_BINARY_DIR}/bin/libassimp-6.dll")
-	#	#	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-	#	#	                   COMMAND ${CMAKE_COMMAND} -E copy_if_different
-	#	#	                   "${ASSIMP_DLL}"
-	#	#	                   "${CMAKE_BINARY_DIR}/"
-	#	#	                   )
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+	set(ASSIMP_DLL "${assimp_BINARY_DIR}/bin/libassimp-6.dll")
+	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+	                   COMMAND ${CMAKE_COMMAND} -E copy_if_different
+	                   "${ASSIMP_DLL}"
+	                   "${CMAKE_BINARY_DIR}/"
+	                   )
 endif ()
 
 foreach (target IN LISTS EXTERNAL_LIBS)
