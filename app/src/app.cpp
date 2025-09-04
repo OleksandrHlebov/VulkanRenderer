@@ -665,7 +665,9 @@ void App::CreateDescriptorSets()
 			imageInfos.emplace_back(VK_NULL_HANDLE, *view, image->GetLayout());
 		}
 
-		std::vector counts(m_FramesInFlight, 1024u);
+		uint32_t const actualSize = static_cast<uint32_t>(m_Scene->GetTextureImages().size() + m_Scene->GetLightMatrices().size());
+
+		std::vector counts(m_FramesInFlight, actualSize);
 
 		vkc::DescriptorSetBuilder builder{ m_Context };
 		m_GlobalDescriptorSets = builder
