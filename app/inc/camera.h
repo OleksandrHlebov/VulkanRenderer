@@ -83,6 +83,11 @@ public:
 		RecalculateProjection();
 	}
 
+	[[nodiscard]] float GetFarPlane() const
+	{
+		return m_Far;
+	}
+
 	[[nodiscard]] glm::mat4 CalculateViewMatrix() const
 	{
 		return glm::lookAt(m_Position, m_Position + m_Forward, WORLD_UP);

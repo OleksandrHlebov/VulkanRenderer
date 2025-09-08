@@ -121,6 +121,8 @@ private:
 
 	uint32_t m_FramesInFlight{};
 	uint32_t m_CurrentFrame{};
+
+	static float constexpr SHADOW_FAR_PLANE = 100.0f;
 };
 
 #endif //APP_H

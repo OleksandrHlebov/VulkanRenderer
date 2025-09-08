@@ -78,6 +78,11 @@ public:
 
 	[[nodiscard]] uint32_t AddTextureToPool(vkc::Image&& image, vkc::ImageView&& imageView);
 
+	[[nodiscard]] std::span<Light> GetPointLights()
+	{
+		return { std::next(m_LightData.Lights.begin(), GetDirectionalLightCount()), m_LightData.Lights.end() }; // NOLINT(*-dangling-handle)
+	}
+
 	void AddLight(Light light);
 	void AddLight(glm::vec3 const& position, bool isPoint, glm::vec3 const& colour, float intensity);
 

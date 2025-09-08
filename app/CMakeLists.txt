@@ -37,7 +37,8 @@ set(SHADER_SOURCES
     "transform_to_lightspace.vert"
     "gbuffer_generation.frag"
     "lighting.frag"
-    "quad.vert")
+    "quad.vert"
+    "frag_depth_override.frag")
 
 set(HEADER
     inc/helper.h

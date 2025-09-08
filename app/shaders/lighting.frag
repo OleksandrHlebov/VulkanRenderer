@@ -8,6 +8,7 @@ layout (location = 0) out vec4 outColour;
 
 layout (set = 0, binding = 0) uniform sampler samp;
 layout (set = 0, binding = 1) uniform texture2D textures[];
+layout (set = 0, binding = 1) uniform textureCube cubemaps[];
 layout (set = 2, binding = 0) uniform texture2D albedo;
 layout (set = 2, binding = 1) uniform texture2D material;
 layout (set = 2, binding = 2) uniform texture2D depthBuffer;
@@ -33,6 +34,7 @@ layout(constant_id = 1) const uint DIRECTIONAL_LIGHT_COUNT = 1u;
 layout(constant_id = 2) const uint POINT_LIGHT_COUNT = 0u;
 layout(constant_id = 3) const bool ENABLE_DIRECTIONAL_LIGHT = true;
 layout(constant_id = 4) const bool ENABLE_POINT_LIGHT = true;
+layout(constant_id = 5) const float SHADOW_FAR_PLANE = 100.f;
 layout(std430, set = 1, binding = 1) readonly buffer LightsSSBO
 {
     Light lights[LIGHT_COUNT];
@@ -167,7 +169,25 @@ void main()
 
         const float illuminance = luminousIntensity * attenuation;
 
-        Lo += CalculateLight(viewDirection, lightDirection, normal, lights[lightIndex].colour.rgb, albedoColour.rgb, roughness, metalness, illuminance);
+        //        // get vector between fragment position and light position
+        //        vec3 fragToLight = worldPosition - lights[lightIndex].position.xyz;
+        //        // use the light to fragment vector to sample from the depth map
+        //        float closestDepth = texture(samplerCube(cubemaps[lights[lightIndex].shadowMapIndex], shadowSampler), fragToLight).r;
+        //        // it is currently in linear range between [0,1]. Re-transform back to original value
+        //        closestDepth *= SHADOW_FAR_PLANE;
+        //        // now get current linear depth as the length between the fragment and light position
+        //        float currentDepth = length(fragToLight);
+        //        // now test for shadows
+        //        float bias = 0.05;
+        //        float shadow = currentDepth -  bias > closestDepth ? 1.0 : 0.0;
+
+        vec3 fragToLight =  -lights[lightIndex].position.xyz + worldPosition;
+        float currentDepth = length(fragToLight) / SHADOW_FAR_PLANE;
+        float shadow = texture(samplerCubeShadow(cubemaps[lights[lightIndex].shadowMapIndex], shadowSampler), vec4(fragToLight, currentDepth)).r;
+        //        outColour = vec4(vec3(shadow), 1.f);
+        //        return;
+
+        Lo += shadow * CalculateLight(viewDirection, lightDirection, normal, lights[lightIndex].colour.rgb, albedoColour.rgb, roughness, metalness, illuminance);
     }
 
     vec3 ambient = vec3(.03f) * albedoColour.rgb;

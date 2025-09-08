@@ -7,6 +7,7 @@ layout (location = 3) in vec3 tangent;
 layout (location = 4) in vec3 bitangent;
 
 layout (location = 0) out vec2 outUV;
+layout (location = 1) out vec4 outPosition;
 layout (push_constant) uniform Constants
 {
     layout (offset = 16)mat4 lightSpaceTransform;
@@ -15,5 +16,6 @@ layout (push_constant) uniform Constants
 void main()
 {
     gl_Position = lightSpaceTransform * vec4(inPosition, 1.f);
+    outPosition = vec4(inPosition, 1.f);
     outUV = inUV;
 }

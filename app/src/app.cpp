@@ -1,5 +1,6 @@
 #include "app.h"
 
+#include <array>
 #include <iostream>
 
 #include "command_pool.h"
@@ -305,6 +306,9 @@ void App::CreateDescriptorSetLayouts()
 
 		m_Context.DispatchTable.createSampler(&samplerCreateInfo, nullptr, &m_TextureSampler);
 
+		samplerCreateInfo.addressModeU  = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		samplerCreateInfo.addressModeV  = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		samplerCreateInfo.addressModeW  = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 		samplerCreateInfo.compareEnable = VK_TRUE;
 		samplerCreateInfo.compareOp     = VK_COMPARE_OP_LESS;
 		m_Context.DispatchTable.createSampler(&samplerCreateInfo, nullptr, &m_ShadowSampler);
@@ -338,65 +342,230 @@ void App::CreateDescriptorSetLayouts()
 void App::GenerateShadowMaps()
 {
 	//
-	if (m_Scene->GetDirectionalLightCount() > 0)
+
 	{
-		constexpr VkExtent2D shadowMapResolution{ 1024, 1024 };
+		std::vector<vkc::Image>     directionalShadowMaps;
+		std::vector<vkc::ImageView> directionalShadowMapViews;
+
+		std::vector<vkc::Image>                  pointShadowMaps;
+		std::vector<std::vector<vkc::ImageView>> pointShadowMapViews;
+
+		std::span pointLights{ m_Scene->GetPointLights() };
+
+		constexpr VkExtent2D shadowMapResolution{ 2048, 2048 };
 		vkc::ImageBuilder    builder{ m_Context };
 		builder
 			.SetAspectFlags(m_DepthImage->GetAspect())
 			.SetFormat(m_DepthImage->GetFormat())
 			.SetType(VK_IMAGE_TYPE_2D)
 			.SetExtent(shadowMapResolution);
-		std::vector<vkc::Image>     directionalShadowMaps;
-		std::vector<vkc::ImageView> directionalShadowMapViews;
 
-		for (uint32_t index{}; index < m_Scene->GetDirectionalLightCount(); ++index)
-		{
-			directionalShadowMaps.emplace_back(builder.Build(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT));
-			directionalShadowMapViews.emplace_back(directionalShadowMaps[index].CreateView(m_Context, VK_IMAGE_VIEW_TYPE_2D));
+		if (m_Scene->GetDirectionalLightCount() > 0)
+			for (uint32_t index{}; index < m_Scene->GetDirectionalLightCount(); ++index)
+			{
+				directionalShadowMaps.emplace_back(builder.Build(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT));
+				directionalShadowMapViews.emplace_back(directionalShadowMaps[index].CreateView(m_Context, VK_IMAGE_VIEW_TYPE_2D));
 
-			help::NameObject(m_Context
-							 , reinterpret_cast<uint64_t>(static_cast<VkImage>(directionalShadowMaps[index]))
-							 , VK_OBJECT_TYPE_IMAGE
-							 , "Directional shadow map");
-			help::NameObject(m_Context
-							 , reinterpret_cast<uint64_t>(static_cast<VkImageView>(directionalShadowMapViews[index]))
-							 , VK_OBJECT_TYPE_IMAGE_VIEW
-							 , "Directional shadow map view");
-		}
+				help::NameObject(m_Context
+								 , reinterpret_cast<uint64_t>(static_cast<VkImage>(directionalShadowMaps[index]))
+								 , VK_OBJECT_TYPE_IMAGE
+								 , "Directional shadow map");
+				help::NameObject(m_Context
+								 , reinterpret_cast<uint64_t>(static_cast<VkImageView>(directionalShadowMapViews[index]))
+								 , VK_OBJECT_TYPE_IMAGE_VIEW
+								 , "Directional shadow map view");
+			}
+
+		builder
+			.SetFlags(VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT)
+			.SetLayers(6);
+		if (m_Scene->GetPointLightCount() > 0)
+			for (uint32_t index{}; index < m_Scene->GetPointLightCount(); ++index)
+			{
+				auto& map = pointShadowMaps.
+					emplace_back(builder.Build(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT));
+				auto& views = pointShadowMapViews.emplace_back();
+				for (int viewIndex{}; viewIndex < 6; ++viewIndex)
+					views.emplace_back(map.CreateView(m_Context, VK_IMAGE_VIEW_TYPE_2D, viewIndex, 1, 0, 1, false));
+
+				help::NameObject(m_Context
+								 , reinterpret_cast<uint64_t>(static_cast<VkImage>(map))
+								 , VK_OBJECT_TYPE_IMAGE
+								 , "point shadow map");
+			}
+
 		vkc::PipelineLayoutBuilder layoutBuilder{ m_Context };
-		vkc::PipelineLayout        pipelineLayout = layoutBuilder
-											 .AddPushConstant(VK_SHADER_STAGE_FRAGMENT_BIT
-															  , 0
-															  , sizeof(uint32_t))
-											 .AddPushConstant(VK_SHADER_STAGE_VERTEX_BIT, 16, sizeof(glm::mat4))
-											 .AddDescriptorSetLayout(*m_GlobalDescSetLayout)
-											 .Build(false);
+		vkc::PipelineLayout        directionalPipelineLayout = layoutBuilder
+														.AddPushConstant(VK_SHADER_STAGE_FRAGMENT_BIT
+																		 , 0
+																		 , sizeof(uint32_t))
+														.AddPushConstant(VK_SHADER_STAGE_VERTEX_BIT, 16, sizeof(glm::mat4))
+														.AddDescriptorSetLayout(*m_GlobalDescSetLayout)
+														.Build(false);
+
+		vkc::PipelineLayoutBuilder pointShadowPipelineLayoutBuilder{ m_Context };
+		vkc::PipelineLayout        pointPipelineLayout = pointShadowPipelineLayoutBuilder
+												  .AddPushConstant(VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT
+																   , 0
+																   , sizeof(glm::vec4) + sizeof(glm::mat4) + sizeof(uint32_t))
+												  .AddDescriptorSetLayout(*m_GlobalDescSetLayout)
+												  .Build(false);
 
 		vkc::ShaderStage vert{ m_Context, help::ReadFile("shaders/transform_to_lightspace.spv"), VK_SHADER_STAGE_VERTEX_BIT };
 		vkc::ShaderStage frag{ m_Context, help::ReadFile("shaders/alpha_discard.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
-		frag.AddSpecializationConstant(static_cast<uint32_t>(m_Scene->GetTextureImages().size()));
+		vkc::ShaderStage depthOverride{ m_Context, help::ReadFile("shaders/frag_depth_override.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
 
 		vkc::PipelineBuilder pipelineBuilder{ m_Context };
-		vkc::Pipeline        pipeline = pipelineBuilder
-								 .AddShaderStage(vert)
-								 .AddShaderStage(frag)
-								 .AddViewport(shadowMapResolution)
-								 .EnableDepthTest(VK_COMPARE_OP_LESS)
-								 .EnableDepthWrite()
-								 .SetDepthBias(1.25f, 1.f)
-								 .SetFrontFace(VK_FRONT_FACE_COUNTER_CLOCKWISE)
-								 .SetCullMode(VK_CULL_MODE_BACK_BIT)
-								 .SetPolygonMode(VK_POLYGON_MODE_FILL)
-								 .SetTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
-								 .SetRenderingAttachments({}
-														  , m_DepthImage->GetFormat()
-														  , VK_FORMAT_UNDEFINED)
-								 .SetVertexDescription(Vertex::GetBindingDescription(), Vertex::GetAttributeDescription())
-								 .Build(pipelineLayout, false);
+		vkc::Pipeline        directionalPipeline = pipelineBuilder
+											.AddShaderStage(vert)
+											.AddShaderStage(frag)
+											.AddViewport(shadowMapResolution)
+											.EnableDepthTest(VK_COMPARE_OP_LESS)
+											.EnableDepthWrite()
+											.SetDepthBias(1.25f, 1.f)
+											.SetFrontFace(VK_FRONT_FACE_COUNTER_CLOCKWISE)
+											.SetCullMode(VK_CULL_MODE_BACK_BIT)
+											.SetPolygonMode(VK_POLYGON_MODE_FILL)
+											.SetTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+											.SetRenderingAttachments({}
+																	 , m_DepthImage->GetFormat()
+																	 , VK_FORMAT_UNDEFINED)
+											.SetVertexDescription(Vertex::GetBindingDescription(), Vertex::GetAttributeDescription())
+											.Build(directionalPipelineLayout, false);
+
+		vkc::PipelineBuilder pointPipelineBuilder{ m_Context };
+		vkc::Pipeline        pointPipeline = pointPipelineBuilder
+									  .AddShaderStage(vert)
+									  .AddShaderStage(depthOverride)
+									  .AddViewport(shadowMapResolution)
+									  .EnableDepthTest(VK_COMPARE_OP_LESS)
+									  .EnableDepthWrite()
+									  .SetDepthBias(1.25f, 1.f)
+									  .SetFrontFace(VK_FRONT_FACE_COUNTER_CLOCKWISE)
+									  .SetCullMode(VK_CULL_MODE_BACK_BIT)
+									  .SetPolygonMode(VK_POLYGON_MODE_FILL)
+									  .SetTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+									  .SetRenderingAttachments({}
+															   , m_DepthImage->GetFormat()
+															   , VK_FORMAT_UNDEFINED)
+									  .SetVertexDescription(Vertex::GetBindingDescription(), Vertex::GetAttributeDescription())
+									  .Build(pointPipelineLayout, false);
 
 		vkc::CommandBuffer& commandBuffer = m_CommandPool->AllocateCommandBuffer(m_Context);
 		commandBuffer.Begin(m_Context, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+		for (uint32_t lightIndex{}; lightIndex < pointLights.size(); ++lightIndex)
+		{
+			auto& light = pointLights[lightIndex];
+			assert(light.IsPoint());
+
+			glm::vec3 eye             = light.GetPosition();
+			glm::mat4 captureViews[6] = {
+				glm::lookAt(eye, eye + glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f))    // +X
+				, glm::lookAt(eye, eye + glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)) // -X
+				, glm::lookAt(eye, eye + glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f))   // +Y
+				, glm::lookAt(eye, eye + glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)) // -Y
+				, glm::lookAt(eye, eye + glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, -1.0f, 0.0f))  // +Z
+				, glm::lookAt(eye, eye + glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, -1.0f, 0.0f)) // -Z
+			};
+			glm::mat4 captureProj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, SHADOW_FAR_PLANE);
+
+			auto& shadowMap   = pointShadowMaps[lightIndex];
+			auto& shadowViews = pointShadowMapViews[lightIndex];
+			// transition to depth attachment optimal
+			{
+				vkc::Image::Transition transition{};
+				transition.NewLayout     = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+				transition.SrcAccessMask = VK_ACCESS_NONE;
+				transition.DstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+				transition.SrcStageMask  = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+				transition.DstStageMask  = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+				transition.LayerCount    = 6;
+				shadowMap.MakeTransition(m_Context, commandBuffer, transition);
+			}
+			for (uint32_t faceIndex{}; faceIndex < 6; ++faceIndex)
+			{
+				auto&                     shadowView = shadowViews[faceIndex];
+				VkRenderingAttachmentInfo depthAttachment{};
+				depthAttachment.sType                   = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+				depthAttachment.clearValue.depthStencil = { 1.f, 0 };
+				depthAttachment.imageLayout             = shadowMap.GetLayout(shadowView.GetBaseLayer(), shadowView.GetBaseMipLevel());
+				depthAttachment.imageView               = shadowView;
+				depthAttachment.loadOp                  = VK_ATTACHMENT_LOAD_OP_CLEAR;
+				depthAttachment.storeOp                 = VK_ATTACHMENT_STORE_OP_STORE;
+
+				VkRenderingInfo renderingInfo{};
+				renderingInfo.sType                = VK_STRUCTURE_TYPE_RENDERING_INFO;
+				renderingInfo.colorAttachmentCount = 0;
+				renderingInfo.pDepthAttachment     = &depthAttachment;
+				renderingInfo.renderArea           = { {}, shadowMapResolution };
+				renderingInfo.layerCount           = 1;
+
+				m_Context.DispatchTable.cmdBeginRendering(commandBuffer, &renderingInfo);
+
+				VkDescriptorSet descSets[]{ m_GlobalDescriptorSets[m_CurrentFrame] };
+				m_Context.DispatchTable.cmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pointPipeline);
+				m_Context.DispatchTable.cmdBindDescriptorSets(commandBuffer
+															  , VK_PIPELINE_BIND_POINT_GRAPHICS
+															  , pointPipelineLayout
+															  , 0
+															  , static_cast<uint32_t>(std::size(descSets))
+															  , descSets
+															  , 0
+															  , nullptr);
+
+				glm::mat4 const lightSpace = captureProj * captureViews[faceIndex];
+				m_Context.DispatchTable.cmdPushConstants(commandBuffer
+														 , pointPipelineLayout
+														 , VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT
+														 , 16
+														 , sizeof(glm::mat4)
+														 , &lightSpace);
+				auto const positionFar = glm::vec4{ glm::vec3{ light.GetPosition() }, SHADOW_FAR_PLANE };
+				m_Context.DispatchTable.cmdPushConstants(commandBuffer
+														 , pointPipelineLayout
+														 , VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT
+														 , 0
+														 , sizeof(glm::vec4)
+														 , &positionFar);
+				for (auto& meshes = m_Scene->GetMeshes();
+					 auto& mesh: meshes)
+				{
+					VkDeviceSize offsets[] = { 0 };
+					m_Context.DispatchTable.cmdPushConstants(commandBuffer
+															 , pointPipelineLayout
+															 , VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT
+															 , sizeof(glm::mat4) + sizeof(glm::vec4)
+															 , sizeof(uint32_t)
+															 , &mesh.GetTextureIndices().Diffuse);
+
+					m_Context.DispatchTable.cmdBindVertexBuffers(commandBuffer
+																 , 0
+																 , 1
+																 , mesh.GetVertexBuffer()
+																 , offsets);
+
+					m_Context.DispatchTable.cmdBindIndexBuffer(commandBuffer, mesh.GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+
+					m_Context.DispatchTable.cmdDrawIndexed(commandBuffer
+														   , static_cast<uint32_t>(mesh.GetIndexBuffer().GetSize() / sizeof(uint32_t))
+														   , 1
+														   , 0
+														   , 0
+														   , 0);
+				}
+				m_Context.DispatchTable.cmdEndRendering(commandBuffer);
+				//
+				{
+					vkc::Image::Transition transition{ shadowView };
+					transition.NewLayout     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+					transition.SrcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+					transition.DstAccessMask = VK_ACCESS_NONE;
+					transition.SrcStageMask  = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+					transition.DstStageMask  = VK_PIPELINE_STAGE_NONE;
+					shadowMap.MakeTransition(m_Context, commandBuffer, transition);
+				}
+			}
+		}
 
 		for (uint32_t index{}; index < directionalShadowMaps.size(); ++index)
 		{
@@ -430,10 +599,10 @@ void App::GenerateShadowMaps()
 			m_Context.DispatchTable.cmdBeginRendering(commandBuffer, &renderingInfo);
 
 			VkDescriptorSet descSets[]{ m_GlobalDescriptorSets[m_CurrentFrame] };
-			m_Context.DispatchTable.cmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+			m_Context.DispatchTable.cmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, directionalPipeline);
 			m_Context.DispatchTable.cmdBindDescriptorSets(commandBuffer
 														  , VK_PIPELINE_BIND_POINT_GRAPHICS
-														  , pipelineLayout
+														  , directionalPipelineLayout
 														  , 0
 														  , static_cast<uint32_t>(std::size(descSets))
 														  , descSets
@@ -442,7 +611,7 @@ void App::GenerateShadowMaps()
 
 			glm::mat4 const lightSpace = m_Scene->GetLightMatrices()[m_Scene->GetLights()[index].GetMatrixIndex()];
 			m_Context.DispatchTable.cmdPushConstants(commandBuffer
-													 , pipelineLayout
+													 , directionalPipelineLayout
 													 , VK_SHADER_STAGE_VERTEX_BIT
 													 , 16
 													 , sizeof(glm::mat4)
@@ -452,7 +621,7 @@ void App::GenerateShadowMaps()
 			{
 				VkDeviceSize offsets[] = { 0 };
 				m_Context.DispatchTable.cmdPushConstants(commandBuffer
-														 , pipelineLayout
+														 , directionalPipelineLayout
 														 , VK_SHADER_STAGE_FRAGMENT_BIT
 														 , 0
 														 , sizeof(uint32_t)
@@ -486,6 +655,10 @@ void App::GenerateShadowMaps()
 			}
 		}
 
+		for (auto& views: pointShadowMapViews)
+			for (auto& view: views)
+				view.Destroy(m_Context);
+
 		commandBuffer.End(m_Context);
 		commandBuffer.Submit(m_Context, m_Context.GraphicsQueue, {}, {});
 		if (m_Context.DispatchTable.waitForFences(1, &commandBuffer.GetFence(), VK_TRUE, UINT64_MAX) != VK_SUCCESS)
@@ -497,11 +670,23 @@ void App::GenerateShadowMaps()
 																	, std::move(directionalShadowMapViews[index]));
 			m_Scene->GetLights()[index].LinkShadowMapIndex(textureIndex);
 		}
+
+		for (uint32_t index{ m_Scene->GetDirectionalLightCount() }; index < m_Scene->GetLights().size(); ++index)
+		{
+			auto& map  = pointShadowMaps[index - m_Scene->GetDirectionalLightCount()];
+			auto  view = map.CreateView(m_Context, VK_IMAGE_VIEW_TYPE_CUBE, 0, 6);
+
+			uint32_t const textureIndex = m_Scene->AddTextureToPool(std::move(map)
+																	, std::move(view));
+			m_Scene->GetLights()[index].LinkShadowMapIndex(textureIndex);
+		}
 		directionalShadowMaps.clear();
 		directionalShadowMapViews.clear();
 
-		pipeline.Destroy(m_Context);
-		pipelineLayout.Destroy(m_Context);
+		directionalPipeline.Destroy(m_Context);
+		directionalPipelineLayout.Destroy(m_Context);
+		pointPipeline.Destroy(m_Context);
+		pointPipelineLayout.Destroy(m_Context);
 		//
 		{
 			auto const& textures     = m_Scene->GetTextureImages();
@@ -510,7 +695,7 @@ void App::GenerateShadowMaps()
 			std::vector<VkDescriptorImageInfo> imageInfos;
 			imageInfos.reserve(textures.size());
 
-			const size_t textureCountWithoutShadowMaps = textures.size() - m_Scene->GetDirectionalLightCount();
+			const size_t textureCountWithoutShadowMaps = textures.size() - m_Scene->GetLights().size();
 
 			for (auto [image, view]{
 					 std::make_pair(textures.begin() + textureCountWithoutShadowMaps, textureViews.begin() + textureCountWithoutShadowMaps)
@@ -665,7 +850,7 @@ void App::CreateDescriptorSets()
 			imageInfos.emplace_back(VK_NULL_HANDLE, *view, image->GetLayout());
 		}
 
-		uint32_t const actualSize = static_cast<uint32_t>(m_Scene->GetTextureImages().size() + m_Scene->GetLightMatrices().size());
+		uint32_t const actualSize = static_cast<uint32_t>(m_Scene->GetTextureImages().size() + m_Scene->GetLights().size());
 
 		std::vector counts(m_FramesInFlight, actualSize);
 
@@ -735,7 +920,6 @@ void App::CreateGraphicsPipeline()
 	{
 		vkc::ShaderStage const vert{ m_Context, help::ReadFile("shaders/basic_transform.spv"), VK_SHADER_STAGE_VERTEX_BIT };
 		vkc::ShaderStage       alphaDiscard{ m_Context, help::ReadFile("shaders/alpha_discard.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
-		alphaDiscard.AddSpecializationConstant(static_cast<uint32_t>(m_Scene->GetTextureImages().size()));
 
 		vkc::PipelineBuilder builder{ m_Context };
 		vkc::Pipeline        pipeline = builder
@@ -759,7 +943,6 @@ void App::CreateGraphicsPipeline()
 	{
 		vkc::ShaderStage const vert{ m_Context, help::ReadFile("shaders/transform_w_normals.spv"), VK_SHADER_STAGE_VERTEX_BIT };
 		vkc::ShaderStage       frag{ m_Context, help::ReadFile("shaders/gbuffer_generation.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
-		frag.AddSpecializationConstant(static_cast<uint32_t>(m_Scene->GetTextureImages().size()));
 
 		VkFormat colorAttachmentFormats[]{ m_AlbedoImage->GetFormat(), m_MaterialImage->GetFormat() };
 
@@ -793,6 +976,7 @@ void App::CreateGraphicsPipeline()
 		lighting.AddSpecializationConstant(m_Scene->GetPointLightCount());
 		lighting.AddSpecializationConstant(hasDirectionalLights & m_Config.EnableDirectionalLights);
 		lighting.AddSpecializationConstant(hasPointLights & m_Config.EnablePointLights);
+		lighting.AddSpecializationConstant(SHADOW_FAR_PLANE);
 
 		VkFormat colorAttachmentFormats[]{ m_Context.Swapchain.image_format };
 
@@ -827,10 +1011,10 @@ void App::CreateScene()
 	m_Scene = std::make_unique<Scene>(m_Context, *m_CommandPool);
 	m_Scene->Load("data/glTF/Sponza.gltf");
 	m_Scene->AddLight(-glm::normalize(glm::vec3{ 0.577f, -0.577f, -0.577f }), false, { .877f, .877f, .577f }, 100.f);
-	m_Scene->AddLight(-glm::normalize(glm::vec3{ .999f, -.577f, .0f }), false, { .877f, .877f, .3f }, 50.f);
-	m_Scene->AddLight({ -2.f, 1.f, .0f }, true, { 1.f, .0f, .0f }, 75.f);
+	// m_Scene->AddLight(-glm::normalize(glm::vec3{ .999f, -.577f, .0f }), false, { .877f, .877f, .3f }, 50.f);
+	m_Scene->AddLight({ -2.f, 1.f, .0f }, true, { 1.f, .0f, .0f }, 125.f);
 	m_Scene->AddLight({ -6.f, 1.f, .0f }, true, { .0f, 1.f, .0f }, 75.f);
-	m_Scene->AddLight({ 2.f, 1.f, .0f }, true, { .666f, .533f, .12f }, 75.f);
+	m_Scene->AddLight({ 6.f, 1.f, .0f }, true, { .666f, .533f, .12f }, 75.f);
 	std::cout << (m_Scene->ContainsPBRInfo() ? "scene contains pbr info" : "scene does not contain pbr info") << std::endl;
 }
 
@@ -852,27 +1036,28 @@ void App::CreateResources()
 		size_t const lightCount         = m_Scene->GetLights().size();
 		size_t const lightMatricesCount = m_Scene->GetLightMatrices().size();
 
-		for (uint32_t index{}; index < m_FramesInFlight; ++index)
-		{
-			m_LightSSBOs.emplace_back(builder.Build(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
-													, lightCount * sizeof(Light)));
-			m_LightSSBOs[index].UpdateData(m_Scene->GetLights());
-			if (!m_Scene->GetLightMatrices().empty())
+		if (lightCount > 0)
+			for (uint32_t index{}; index < m_FramesInFlight; ++index)
 			{
-				m_LightMatricesSSBOs.emplace_back(builder.Build(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
-																, lightMatricesCount * sizeof(glm::mat4)));
+				m_LightSSBOs.emplace_back(builder.Build(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+														, lightCount * sizeof(Light)));
+				m_LightSSBOs[index].UpdateData(m_Scene->GetLights());
+				if (!m_Scene->GetLightMatrices().empty())
+				{
+					m_LightMatricesSSBOs.emplace_back(builder.Build(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+																	, lightMatricesCount * sizeof(glm::mat4)));
 
-				m_LightMatricesSSBOs[index].UpdateData(m_Scene->GetLightMatrices());
+					m_LightMatricesSSBOs[index].UpdateData(m_Scene->GetLightMatrices());
+					help::NameObject(m_Context
+									 , reinterpret_cast<uint64_t>(static_cast<VkBuffer>(m_LightMatricesSSBOs[index]))
+									 , VK_OBJECT_TYPE_BUFFER
+									 , "Light matrices SSBO");
+				}
 				help::NameObject(m_Context
-								 , reinterpret_cast<uint64_t>(static_cast<VkBuffer>(m_LightMatricesSSBOs[index]))
+								 , reinterpret_cast<uint64_t>(static_cast<VkBuffer>(m_LightSSBOs[index]))
 								 , VK_OBJECT_TYPE_BUFFER
-								 , "Light matrices SSBO");
+								 , "Light SSBO");
 			}
-			help::NameObject(m_Context
-							 , reinterpret_cast<uint64_t>(static_cast<VkBuffer>(m_LightSSBOs[index]))
-							 , VK_OBJECT_TYPE_BUFFER
-							 , "Light SSBO");
-		}
 	}
 	CreateDepth();
 	CreateGBuffer();
