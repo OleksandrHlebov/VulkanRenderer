@@ -3,8 +3,6 @@ project(VulkanResearch)
 
 set(CMAKE_CXX_STANDARD 20)
 
-set(BUILD_SHARED_LIBS ON)
-
 include(FetchContent)
 set(EXTERNAL_LIBS)
 
@@ -12,7 +10,8 @@ FetchContent_Declare(
 		glm
 		URL https://github.com/g-truc/glm/archive/refs/tags/1.0.1.tar.gz)
 FetchContent_MakeAvailable(glm)
-list(APPEND EXTERNAL_LIBS glm)
+
+set(BUILD_SHARED_LIBS ON)
 
 FetchContent_Declare(
 		assimp
