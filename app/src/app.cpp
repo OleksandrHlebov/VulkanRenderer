@@ -1,12 +1,12 @@
 #include "app.h"
 
-#include <array>
 #include <iostream>
 
 #include "command_pool.h"
 #include "datatypes.h"
 #include "helper.h"
 #include "image.h"
+#include "shadow_generation.h"
 #include "shader_stage.h"
 
 #include <span>
@@ -342,15 +342,12 @@ void App::CreateDescriptorSetLayouts()
 void App::GenerateShadowMaps()
 {
 	//
-
 	{
 		std::vector<vkc::Image>     directionalShadowMaps;
 		std::vector<vkc::ImageView> directionalShadowMapViews;
 
 		std::vector<vkc::Image>                  pointShadowMaps;
 		std::vector<std::vector<vkc::ImageView>> pointShadowMapViews;
-
-		std::span pointLights{ m_Scene->GetPointLights() };
 
 		constexpr VkExtent2D shadowMapResolution{ 2048, 2048 };
 		vkc::ImageBuilder    builder{ m_Context };
@@ -394,275 +391,55 @@ void App::GenerateShadowMaps()
 								 , "point shadow map");
 			}
 
-		vkc::PipelineLayoutBuilder layoutBuilder{ m_Context };
-		vkc::PipelineLayout        directionalPipelineLayout = layoutBuilder
-														.AddPushConstant(VK_SHADER_STAGE_FRAGMENT_BIT
-																		 , 0
-																		 , sizeof(uint32_t))
-														.AddPushConstant(VK_SHADER_STAGE_VERTEX_BIT, 16, sizeof(glm::mat4))
-														.AddDescriptorSetLayout(*m_GlobalDescSetLayout)
-														.Build(false);
-
-		vkc::PipelineLayoutBuilder pointShadowPipelineLayoutBuilder{ m_Context };
-		vkc::PipelineLayout        pointPipelineLayout = pointShadowPipelineLayoutBuilder
-												  .AddPushConstant(VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT
-																   , 0
-																   , sizeof(glm::vec4) + sizeof(glm::mat4) + sizeof(uint32_t))
-												  .AddDescriptorSetLayout(*m_GlobalDescSetLayout)
-												  .Build(false);
-
-		vkc::ShaderStage vert{ m_Context, help::ReadFile("shaders/transform_to_lightspace.spv"), VK_SHADER_STAGE_VERTEX_BIT };
-		vkc::ShaderStage frag{ m_Context, help::ReadFile("shaders/alpha_discard.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
-		vkc::ShaderStage depthOverride{ m_Context, help::ReadFile("shaders/frag_depth_override.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
-
-		vkc::PipelineBuilder pipelineBuilder{ m_Context };
-		vkc::Pipeline        directionalPipeline = pipelineBuilder
-											.AddShaderStage(vert)
-											.AddShaderStage(frag)
-											.AddViewport(shadowMapResolution)
-											.EnableDepthTest(VK_COMPARE_OP_LESS)
-											.EnableDepthWrite()
-											.SetDepthBias(1.25f, 1.f)
-											.SetFrontFace(VK_FRONT_FACE_COUNTER_CLOCKWISE)
-											.SetCullMode(VK_CULL_MODE_BACK_BIT)
-											.SetPolygonMode(VK_POLYGON_MODE_FILL)
-											.SetTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
-											.SetRenderingAttachments({}
-																	 , m_DepthImage->GetFormat()
-																	 , VK_FORMAT_UNDEFINED)
-											.SetVertexDescription(Vertex::GetBindingDescription(), Vertex::GetAttributeDescription())
-											.Build(directionalPipelineLayout, false);
-
-		vkc::PipelineBuilder pointPipelineBuilder{ m_Context };
-		vkc::Pipeline        pointPipeline = pointPipelineBuilder
-									  .AddShaderStage(vert)
-									  .AddShaderStage(depthOverride)
-									  .AddViewport(shadowMapResolution)
-									  .EnableDepthTest(VK_COMPARE_OP_LESS)
-									  .EnableDepthWrite()
-									  .SetDepthBias(1.25f, 1.f)
-									  .SetFrontFace(VK_FRONT_FACE_COUNTER_CLOCKWISE)
-									  .SetCullMode(VK_CULL_MODE_BACK_BIT)
-									  .SetPolygonMode(VK_POLYGON_MODE_FILL)
-									  .SetTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
-									  .SetRenderingAttachments({}
-															   , m_DepthImage->GetFormat()
-															   , VK_FORMAT_UNDEFINED)
-									  .SetVertexDescription(Vertex::GetBindingDescription(), Vertex::GetAttributeDescription())
-									  .Build(pointPipelineLayout, false);
+		auto [directionalPipelineLayout, directionalPipeline] = shadow::CreatePipelineForDirectionalShadows(m_Context
+				 , *m_GlobalDescSetLayout
+				 , m_DepthFormat
+				 , shadowMapResolution);
+		auto [pointPipelineLayout, pointPipeline] = shadow::CreatePipelineForPointShadows(m_Context
+																						  , *m_GlobalDescSetLayout
+																						  , m_DepthFormat
+																						  , shadowMapResolution);
 
 		vkc::CommandBuffer& commandBuffer = m_CommandPool->AllocateCommandBuffer(m_Context);
 		commandBuffer.Begin(m_Context, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-		for (uint32_t lightIndex{}; lightIndex < pointLights.size(); ++lightIndex)
-		{
-			auto& light = pointLights[lightIndex];
-			assert(light.IsPoint());
 
-			glm::vec3 eye             = light.GetPosition();
-			glm::mat4 captureViews[6] = {
-				glm::lookAt(eye, eye + glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f))    // +X
-				, glm::lookAt(eye, eye + glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)) // -X
-				, glm::lookAt(eye, eye + glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f))   // +Y
-				, glm::lookAt(eye, eye + glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)) // -Y
-				, glm::lookAt(eye, eye + glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, -1.0f, 0.0f))  // +Z
-				, glm::lookAt(eye, eye + glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, -1.0f, 0.0f)) // -Z
-			};
-			glm::mat4 captureProj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, SHADOW_FAR_PLANE);
+		VkDescriptorSet descSets[]{ m_GlobalDescriptorSets[m_CurrentFrame] };
 
-			auto& shadowMap   = pointShadowMaps[lightIndex];
-			auto& shadowViews = pointShadowMapViews[lightIndex];
-			// transition to depth attachment optimal
-			{
-				vkc::Image::Transition transition{};
-				transition.NewLayout     = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
-				transition.SrcAccessMask = VK_ACCESS_NONE;
-				transition.DstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
-				transition.SrcStageMask  = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-				transition.DstStageMask  = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-				transition.LayerCount    = 6;
-				shadowMap.MakeTransition(m_Context, commandBuffer, transition);
-			}
-			for (uint32_t faceIndex{}; faceIndex < 6; ++faceIndex)
-			{
-				auto&                     shadowView = shadowViews[faceIndex];
-				VkRenderingAttachmentInfo depthAttachment{};
-				depthAttachment.sType                   = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-				depthAttachment.clearValue.depthStencil = { 1.f, 0 };
-				depthAttachment.imageLayout             = shadowMap.GetLayout(shadowView.GetBaseLayer(), shadowView.GetBaseMipLevel());
-				depthAttachment.imageView               = shadowView;
-				depthAttachment.loadOp                  = VK_ATTACHMENT_LOAD_OP_CLEAR;
-				depthAttachment.storeOp                 = VK_ATTACHMENT_STORE_OP_STORE;
+		FrameData const pointLightData{
+			.PipelineLayout{ pointPipelineLayout }
+			, .Pipeline{ pointPipeline }
+			, .DescriptorSetLayouts{ m_GlobalDescSetLayout.get(), 1 }
+			, .DescriptorSets{ descSets }
+		};
 
-				VkRenderingInfo renderingInfo{};
-				renderingInfo.sType                = VK_STRUCTURE_TYPE_RENDERING_INFO;
-				renderingInfo.colorAttachmentCount = 0;
-				renderingInfo.pDepthAttachment     = &depthAttachment;
-				renderingInfo.renderArea           = { {}, shadowMapResolution };
-				renderingInfo.layerCount           = 1;
+		FrameData const directionalLightData{
+			.PipelineLayout{ directionalPipelineLayout }
+			, .Pipeline{ directionalPipeline }
+			, .DescriptorSetLayouts{ m_GlobalDescSetLayout.get(), 1 }
+			, .DescriptorSets{ descSets }
+		};
+		shadow::RecordPointShadowsGeneration(m_Context
+											 , commandBuffer
+											 , *m_Scene
+											 , pointShadowMaps
+											 , pointShadowMapViews
+											 , pointLightData);
 
-				m_Context.DispatchTable.cmdBeginRendering(commandBuffer, &renderingInfo);
-
-				VkDescriptorSet descSets[]{ m_GlobalDescriptorSets[m_CurrentFrame] };
-				m_Context.DispatchTable.cmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pointPipeline);
-				m_Context.DispatchTable.cmdBindDescriptorSets(commandBuffer
-															  , VK_PIPELINE_BIND_POINT_GRAPHICS
-															  , pointPipelineLayout
-															  , 0
-															  , static_cast<uint32_t>(std::size(descSets))
-															  , descSets
-															  , 0
-															  , nullptr);
-
-				glm::mat4 const lightSpace = captureProj * captureViews[faceIndex];
-				m_Context.DispatchTable.cmdPushConstants(commandBuffer
-														 , pointPipelineLayout
-														 , VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT
-														 , 16
-														 , sizeof(glm::mat4)
-														 , &lightSpace);
-				auto const positionFar = glm::vec4{ glm::vec3{ light.GetPosition() }, SHADOW_FAR_PLANE };
-				m_Context.DispatchTable.cmdPushConstants(commandBuffer
-														 , pointPipelineLayout
-														 , VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT
-														 , 0
-														 , sizeof(glm::vec4)
-														 , &positionFar);
-				for (auto& meshes = m_Scene->GetMeshes();
-					 auto& mesh: meshes)
-				{
-					VkDeviceSize offsets[] = { 0 };
-					m_Context.DispatchTable.cmdPushConstants(commandBuffer
-															 , pointPipelineLayout
-															 , VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT
-															 , sizeof(glm::mat4) + sizeof(glm::vec4)
-															 , sizeof(uint32_t)
-															 , &mesh.GetTextureIndices().Diffuse);
-
-					m_Context.DispatchTable.cmdBindVertexBuffers(commandBuffer
-																 , 0
-																 , 1
-																 , mesh.GetVertexBuffer()
-																 , offsets);
-
-					m_Context.DispatchTable.cmdBindIndexBuffer(commandBuffer, mesh.GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
-
-					m_Context.DispatchTable.cmdDrawIndexed(commandBuffer
-														   , static_cast<uint32_t>(mesh.GetIndexBuffer().GetSize() / sizeof(uint32_t))
-														   , 1
-														   , 0
-														   , 0
-														   , 0);
-				}
-				m_Context.DispatchTable.cmdEndRendering(commandBuffer);
-				//
-				{
-					vkc::Image::Transition transition{ shadowView };
-					transition.NewLayout     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-					transition.SrcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-					transition.DstAccessMask = VK_ACCESS_NONE;
-					transition.SrcStageMask  = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-					transition.DstStageMask  = VK_PIPELINE_STAGE_NONE;
-					shadowMap.MakeTransition(m_Context, commandBuffer, transition);
-				}
-			}
-		}
-
-		for (uint32_t index{}; index < directionalShadowMaps.size(); ++index)
-		{
-			auto& shadowMap  = directionalShadowMaps[index];
-			auto& shadowView = directionalShadowMapViews[index];
-			// transition to depth attachment optimal
-			{
-				vkc::Image::Transition transition{ directionalShadowMapViews[index] };
-				transition.NewLayout     = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
-				transition.SrcAccessMask = VK_ACCESS_NONE;
-				transition.DstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
-				transition.SrcStageMask  = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-				transition.DstStageMask  = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-				shadowMap.MakeTransition(m_Context, commandBuffer, transition);
-			}
-			VkRenderingAttachmentInfo depthAttachment{};
-			depthAttachment.sType                   = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-			depthAttachment.clearValue.depthStencil = { 1.f, 0 };
-			depthAttachment.imageLayout             = shadowMap.GetLayout();
-			depthAttachment.imageView               = shadowView;
-			depthAttachment.loadOp                  = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			depthAttachment.storeOp                 = VK_ATTACHMENT_STORE_OP_STORE;
-
-			VkRenderingInfo renderingInfo{};
-			renderingInfo.sType                = VK_STRUCTURE_TYPE_RENDERING_INFO;
-			renderingInfo.colorAttachmentCount = 0;
-			renderingInfo.pDepthAttachment     = &depthAttachment;
-			renderingInfo.renderArea           = { {}, shadowMapResolution };
-			renderingInfo.layerCount           = 1;
-
-			m_Context.DispatchTable.cmdBeginRendering(commandBuffer, &renderingInfo);
-
-			VkDescriptorSet descSets[]{ m_GlobalDescriptorSets[m_CurrentFrame] };
-			m_Context.DispatchTable.cmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, directionalPipeline);
-			m_Context.DispatchTable.cmdBindDescriptorSets(commandBuffer
-														  , VK_PIPELINE_BIND_POINT_GRAPHICS
-														  , directionalPipelineLayout
-														  , 0
-														  , static_cast<uint32_t>(std::size(descSets))
-														  , descSets
-														  , 0
-														  , nullptr);
-
-			glm::mat4 const lightSpace = m_Scene->GetLightMatrices()[m_Scene->GetLights()[index].GetMatrixIndex()];
-			m_Context.DispatchTable.cmdPushConstants(commandBuffer
-													 , directionalPipelineLayout
-													 , VK_SHADER_STAGE_VERTEX_BIT
-													 , 16
-													 , sizeof(glm::mat4)
-													 , &lightSpace);
-			for (auto& meshes = m_Scene->GetMeshes();
-				 auto& mesh: meshes)
-			{
-				VkDeviceSize offsets[] = { 0 };
-				m_Context.DispatchTable.cmdPushConstants(commandBuffer
-														 , directionalPipelineLayout
-														 , VK_SHADER_STAGE_FRAGMENT_BIT
-														 , 0
-														 , sizeof(uint32_t)
-														 , &mesh.GetTextureIndices().Diffuse);
-
-				m_Context.DispatchTable.cmdBindVertexBuffers(commandBuffer
-															 , 0
-															 , 1
-															 , mesh.GetVertexBuffer()
-															 , offsets);
-
-				m_Context.DispatchTable.cmdBindIndexBuffer(commandBuffer, mesh.GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
-
-				m_Context.DispatchTable.cmdDrawIndexed(commandBuffer
-													   , static_cast<uint32_t>(mesh.GetIndexBuffer().GetSize() / sizeof(uint32_t))
-													   , 1
-													   , 0
-													   , 0
-													   , 0);
-			}
-			m_Context.DispatchTable.cmdEndRendering(commandBuffer);
-			//
-			{
-				vkc::Image::Transition transition{ shadowView };
-				transition.NewLayout     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				transition.SrcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-				transition.DstAccessMask = VK_ACCESS_NONE;
-				transition.SrcStageMask  = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-				transition.DstStageMask  = VK_PIPELINE_STAGE_NONE;
-				shadowMap.MakeTransition(m_Context, commandBuffer, transition);
-			}
-		}
-
-		for (auto& views: pointShadowMapViews)
-			for (auto& view: views)
-				view.Destroy(m_Context);
+		shadow::RecordDirectionalShadowsGeneration(m_Context
+												   , commandBuffer
+												   , *m_Scene
+												   , directionalShadowMaps
+												   , directionalShadowMapViews
+												   , directionalLightData);
 
 		commandBuffer.End(m_Context);
 		commandBuffer.Submit(m_Context, m_Context.GraphicsQueue, {}, {});
 		if (m_Context.DispatchTable.waitForFences(1, &commandBuffer.GetFence(), VK_TRUE, UINT64_MAX) != VK_SUCCESS)
 			throw std::runtime_error("failed to wait for command buffer fence");
+
+		for (auto& views: pointShadowMapViews)
+			for (auto& view: views)
+				view.Destroy(m_Context);
 
 		for (uint32_t index{}; index < directionalShadowMaps.size(); ++index)
 		{
@@ -687,7 +464,7 @@ void App::GenerateShadowMaps()
 		directionalPipelineLayout.Destroy(m_Context);
 		pointPipeline.Destroy(m_Context);
 		pointPipelineLayout.Destroy(m_Context);
-		//
+		// update descriptor texture array with newly created shadow maps
 		{
 			auto const& textures     = m_Scene->GetTextureImages();
 			auto const& textureViews = m_Scene->GetTextureImageViews();

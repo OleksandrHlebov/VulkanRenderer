@@ -4,6 +4,9 @@
 
 #include "vulkan/vulkan_core.h"
 #include "glm/glm.hpp"
+#include "pipeline_layout.h"
+#include "pipeline.h"
+#include "descriptor_set_layout.h"
 
 struct ModelViewProj
 {
@@ -24,6 +27,14 @@ struct Config
 {
 	VkBool32 EnableDirectionalLights{ VK_TRUE };
 	VkBool32 EnablePointLights{ VK_TRUE };
+};
+
+struct FrameData
+{
+	vkc::PipelineLayout&                PipelineLayout;
+	vkc::Pipeline&                      Pipeline;
+	std::span<vkc::DescriptorSetLayout> DescriptorSetLayouts;
+	std::span<VkDescriptorSet>          DescriptorSets;
 };
 
 class Light

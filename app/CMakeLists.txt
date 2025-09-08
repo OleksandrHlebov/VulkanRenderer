@@ -47,7 +47,8 @@ set(HEADER
     inc/world_time.h
     inc/scene.h
     inc/mesh.h
-    inc/HDRIRenderTarget.h)
+    inc/HDRIRenderTarget.h
+    inc/shadow_generation.h)
 
 set(SOURCE
     src/app.cpp
