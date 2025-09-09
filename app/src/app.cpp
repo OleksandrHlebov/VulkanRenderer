@@ -406,17 +406,17 @@ void App::GenerateShadowMaps()
 		VkDescriptorSet descSets[]{ m_GlobalDescriptorSets[m_CurrentFrame] };
 
 		FrameData const pointLightData{
-			.PipelineLayout{ pointPipelineLayout }
-			, .Pipeline{ pointPipeline }
-			, .DescriptorSetLayouts{ m_GlobalDescSetLayout.get(), 1 }
-			, .DescriptorSets{ descSets }
+			.PipelineLayout = &pointPipelineLayout
+			, .Pipeline = &pointPipeline
+			, .DescriptorSetLayouts = { m_GlobalDescSetLayout.get(), 1 }
+			, .DescriptorSets = { descSets }
 		};
 
 		FrameData const directionalLightData{
-			.PipelineLayout{ directionalPipelineLayout }
-			, .Pipeline{ directionalPipeline }
-			, .DescriptorSetLayouts{ m_GlobalDescSetLayout.get(), 1 }
-			, .DescriptorSets{ descSets }
+			.PipelineLayout = &directionalPipelineLayout
+			, .Pipeline = &directionalPipeline
+			, .DescriptorSetLayouts = { m_GlobalDescSetLayout.get(), 1 }
+			, .DescriptorSets = { descSets }
 		};
 		shadow::RecordPointShadowsGeneration(m_Context
 											 , commandBuffer

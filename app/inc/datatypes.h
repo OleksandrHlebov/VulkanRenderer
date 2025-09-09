@@ -31,8 +31,8 @@ struct Config
 
 struct FrameData
 {
-	vkc::PipelineLayout&                PipelineLayout;
-	vkc::Pipeline&                      Pipeline;
+	vkc::PipelineLayout*                PipelineLayout;
+	vkc::Pipeline*                      Pipeline;
 	std::span<vkc::DescriptorSetLayout> DescriptorSetLayouts;
 	std::span<VkDescriptorSet>          DescriptorSets;
 };

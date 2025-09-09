@@ -135,10 +135,10 @@ namespace shadow
 
 				context.DispatchTable.cmdBeginRendering(commandBuffer, &renderingInfo);
 
-				context.DispatchTable.cmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, frameData.Pipeline);
+				context.DispatchTable.cmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *frameData.Pipeline);
 				context.DispatchTable.cmdBindDescriptorSets(commandBuffer
 															, VK_PIPELINE_BIND_POINT_GRAPHICS
-															, frameData.PipelineLayout
+															, *frameData.PipelineLayout
 															, 0
 															, static_cast<uint32_t>(frameData.DescriptorSets.size())
 															, frameData.DescriptorSets.data()
@@ -147,14 +147,14 @@ namespace shadow
 
 				glm::mat4 const lightSpace = captureProj * captureViews[faceIndex];
 				context.DispatchTable.cmdPushConstants(commandBuffer
-													   , frameData.PipelineLayout
+													   , *frameData.PipelineLayout
 													   , VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT
 													   , 16
 													   , sizeof(glm::mat4)
 													   , &lightSpace);
 				auto const positionFar = glm::vec4{ glm::vec3{ light.GetPosition() }, App::SHADOW_FAR_PLANE };
 				context.DispatchTable.cmdPushConstants(commandBuffer
-													   , frameData.PipelineLayout
+													   , *frameData.PipelineLayout
 													   , VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT
 													   , 0
 													   , sizeof(glm::vec4)
@@ -164,7 +164,7 @@ namespace shadow
 				{
 					VkDeviceSize offsets[] = { 0 };
 					context.DispatchTable.cmdPushConstants(commandBuffer
-														   , frameData.PipelineLayout
+														   , *frameData.PipelineLayout
 														   , VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT
 														   , sizeof(glm::mat4) + sizeof(glm::vec4)
 														   , sizeof(uint32_t)
@@ -241,10 +241,10 @@ namespace shadow
 
 			context.DispatchTable.cmdBeginRendering(commandBuffer, &renderingInfo);
 
-			context.DispatchTable.cmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, frameData.Pipeline);
+			context.DispatchTable.cmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *frameData.Pipeline);
 			context.DispatchTable.cmdBindDescriptorSets(commandBuffer
 														, VK_PIPELINE_BIND_POINT_GRAPHICS
-														, frameData.PipelineLayout
+														, *frameData.PipelineLayout
 														, 0
 														, static_cast<uint32_t>(frameData.DescriptorSets.size())
 														, frameData.DescriptorSets.data()
@@ -253,7 +253,7 @@ namespace shadow
 
 			glm::mat4 const lightSpace = scene.GetLightMatrices()[scene.GetLights()[index].GetMatrixIndex()];
 			context.DispatchTable.cmdPushConstants(commandBuffer
-												   , frameData.PipelineLayout
+												   , *frameData.PipelineLayout
 												   , VK_SHADER_STAGE_VERTEX_BIT
 												   , 16
 												   , sizeof(glm::mat4)
@@ -263,7 +263,7 @@ namespace shadow
 			{
 				VkDeviceSize offsets[] = { 0 };
 				context.DispatchTable.cmdPushConstants(commandBuffer
-													   , frameData.PipelineLayout
+													   , *frameData.PipelineLayout
 													   , VK_SHADER_STAGE_FRAGMENT_BIT
 													   , 0
 													   , sizeof(uint32_t)
