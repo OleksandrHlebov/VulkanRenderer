@@ -1,5 +1,7 @@
 #include "HDRIRenderTarget.h"
 
+#include "helper.h"
+
 HDRIRenderTarget::HDRIRenderTarget(vkc::Context& context)
 	: m_Images{
 		[&context]()-> std::array<vkc::Image, 2>
@@ -38,13 +40,28 @@ HDRIRenderTarget::HDRIRenderTarget(vkc::Context& context)
 									   , false)
 			};
 		}(m_Images)
-	} {}
+	}
+{
+	for (auto& image: m_Images)
+		help::NameObject(context, reinterpret_cast<uint64_t>(static_cast<VkImage>(image)), VK_OBJECT_TYPE_IMAGE, "HDRImage");
+}
 
-vkc::ImageView& HDRIRenderTarget::AcquireNextImageView()
+std::pair<vkc::Image*, vkc::ImageView*> HDRIRenderTarget::AcquireNextTarget()
 {
 	++m_ImageIndex;
 	m_ImageIndex %= 2;
-	return m_ImageViews[m_ImageIndex];
+	return { &m_Images[m_ImageIndex], &m_ImageViews[m_ImageIndex] };
+}
+
+std::pair<vkc::Image*, vkc::ImageView*> HDRIRenderTarget::AcquireCurrentTarget()
+{
+	return { &m_Images[m_ImageIndex], &m_ImageViews[m_ImageIndex] };
+}
+
+std::pair<vkc::Image*, vkc::ImageView*> HDRIRenderTarget::AcquireLastRenderedToTarget()
+{
+	assert(HasBeenRenderedTo());
+	return { &m_Images[m_ImageIndex], &m_ImageViews[m_ImageIndex] };
 }
 
 void HDRIRenderTarget::Destroy(vkc::Context const& context) const

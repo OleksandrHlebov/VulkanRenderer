@@ -288,6 +288,7 @@ void App::CreateDescriptorSetLayouts()
 										  .AddBinding(0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
 										  .AddBinding(1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
 										  .AddBinding(2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
+										  .AddBinding(3, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT, 2)
 										  .Build();
 
 		m_GbufferDescSetLayout = std::make_unique<vkc::DescriptorSetLayout>(std::move(layout));
@@ -515,6 +516,7 @@ void App::CreateDescriptorPool()
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)  // normals and material
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)  // depth
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)  // shadow maps
+							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)  // hdri
 							   .Build(3 * m_FramesInFlight);
 
 	m_DescPool = std::make_unique<vkc::DescriptorPool>(std::move(pool));
@@ -522,27 +524,38 @@ void App::CreateDescriptorPool()
 
 void App::UpdateGbufferDescriptor()
 {
+	VkDescriptorImageInfo albedoInfo{};
+	albedoInfo.sampler     = VK_NULL_HANDLE;
+	albedoInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	albedoInfo.imageView   = *m_AlbedoView;
+
+	VkDescriptorImageInfo normalsInfo{};
+	normalsInfo.sampler     = VK_NULL_HANDLE;
+	normalsInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	normalsInfo.imageView   = *m_MaterialView;
+
+	VkDescriptorImageInfo depthInfo{};
+	depthInfo.sampler     = VK_NULL_HANDLE;
+	depthInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	depthInfo.imageView   = *m_DepthImageView;
+
+	auto const hdriViews = m_HDRIRenderTarget->GetViews();
+
+	VkDescriptorImageInfo HDRIInfo[2]{};
+	for (int index{}; index < 2; ++index)
+	{
+		HDRIInfo[index].sampler     = VK_NULL_HANDLE;
+		HDRIInfo[index].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		HDRIInfo[index].imageView   = hdriViews[index];
+	}
+
 	for (uint32_t index{}; index < m_FramesInFlight; ++index)
 	{
-		VkDescriptorImageInfo albedoInfo{};
-		albedoInfo.sampler     = VK_NULL_HANDLE;
-		albedoInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		albedoInfo.imageView   = *m_AlbedoView;
-
-		VkDescriptorImageInfo normalsInfo{};
-		normalsInfo.sampler     = VK_NULL_HANDLE;
-		normalsInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		normalsInfo.imageView   = *m_MaterialView;
-
-		VkDescriptorImageInfo depthInfo{};
-		depthInfo.sampler     = VK_NULL_HANDLE;
-		depthInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		depthInfo.imageView   = *m_DepthImageView;
-
 		m_GbufferDescriptorSets[index]
 			.AddWriteDescriptor({ &albedoInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 0, 0)
 			.AddWriteDescriptor({ &normalsInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, 0)
 			.AddWriteDescriptor({ &depthInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 2, 0)
+			.AddWriteDescriptor(HDRIInfo, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 3, 0)
 			.Update(m_Context);
 	}
 }
@@ -686,6 +699,23 @@ void App::CreateGraphicsPipeline()
 		if (m_Context.DispatchTable.setDebugUtilsObjectNameEXT(&debugNameInfo) != VK_SUCCESS)
 			throw std::runtime_error("failed to set debug object name");
 	}
+	// blit layout
+	{
+		vkc::PipelineLayoutBuilder builder{ m_Context };
+		vkc::PipelineLayout        layout = builder
+									 .AddPushConstant(VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(uint32_t))
+									 .AddDescriptorSetLayout(*m_GlobalDescSetLayout)
+									 .AddDescriptorSetLayout(*m_GbufferDescSetLayout)
+									 .Build();
+		m_BlitPipelineLayout = std::make_unique<vkc::PipelineLayout>(std::move(layout));
+		VkDebugUtilsObjectNameInfoEXT debugNameInfo{};
+		debugNameInfo.sType        = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+		debugNameInfo.objectType   = VK_OBJECT_TYPE_PIPELINE_LAYOUT;
+		debugNameInfo.objectHandle = reinterpret_cast<uint64_t>(static_cast<VkPipelineLayout>(*m_BlitPipelineLayout));
+		debugNameInfo.pObjectName  = "Pipeline Layout (blit)";
+		if (m_Context.DispatchTable.setDebugUtilsObjectNameEXT(&debugNameInfo) != VK_SUCCESS)
+			throw std::runtime_error("failed to set debug object name");
+	}
 
 	VkPipelineColorBlendAttachmentState blendAttachment{};
 	blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT
@@ -742,7 +772,7 @@ void App::CreateGraphicsPipeline()
 								 .Build(*m_GBufferGenPipelineLayout, true);
 		m_GBufferGenPipeline = std::make_unique<vkc::Pipeline>(std::move(pipeline));
 	}
-	// default pipeline
+	// lighting pipeline
 	{
 		vkc::ShaderStage quad{ m_Context, help::ReadFile("shaders/quad.spv"), VK_SHADER_STAGE_VERTEX_BIT };
 		vkc::ShaderStage lighting{ m_Context, help::ReadFile("shaders/lighting.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
@@ -755,7 +785,7 @@ void App::CreateGraphicsPipeline()
 		lighting.AddSpecializationConstant(hasPointLights & m_Config.EnablePointLights);
 		lighting.AddSpecializationConstant(SHADOW_FAR_PLANE);
 
-		VkFormat colorAttachmentFormats[]{ m_Context.Swapchain.image_format };
+		VkFormat colorAttachmentFormats[]{ m_HDRIRenderTarget->GetFormat() };
 
 		vkc::PipelineBuilder builder{ m_Context };
 		vkc::Pipeline        pipeline = builder
@@ -772,6 +802,29 @@ void App::CreateGraphicsPipeline()
 								 .AddShaderStage(lighting)
 								 .Build(*m_LightingPipelineLayout, true);
 		m_LightingPipeline = std::make_unique<vkc::Pipeline>(std::move(pipeline));
+	}
+	// blit pipeline
+	{
+		vkc::ShaderStage quad{ m_Context, help::ReadFile("shaders/quad.spv"), VK_SHADER_STAGE_VERTEX_BIT };
+		vkc::ShaderStage blit{ m_Context, help::ReadFile("shaders/blit.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
+
+		VkFormat colorAttachmentFormats[]{ m_Context.Swapchain.image_format };
+
+		vkc::PipelineBuilder builder{ m_Context };
+		vkc::Pipeline        pipeline = builder
+								 .SetTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+								 .AddViewport(m_Context.Swapchain.extent)
+								 .SetPolygonMode(VK_POLYGON_MODE_FILL)
+								 .SetCullMode(VK_CULL_MODE_NONE)
+								 .SetFrontFace(VK_FRONT_FACE_COUNTER_CLOCKWISE)
+								 .AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT)
+								 .AddDynamicState(VK_DYNAMIC_STATE_SCISSOR)
+								 .AddColorBlendAttachment(blendAttachment)
+								 .SetRenderingAttachments(colorAttachmentFormats, m_DepthFormat, VK_FORMAT_UNDEFINED)
+								 .AddShaderStage(quad)
+								 .AddShaderStage(blit)
+								 .Build(*m_BlitPipelineLayout, true);
+		m_BlitPipeline = std::make_unique<vkc::Pipeline>(std::move(pipeline));
 	}
 }
 
@@ -838,6 +891,7 @@ void App::CreateResources()
 	}
 	CreateDepth();
 	CreateGBuffer();
+	m_HDRIRenderTarget = std::make_unique<HDRIRenderTarget>(m_Context);
 	m_Context.DeletionQueue.Push([this]
 	{
 		m_DepthImage->Destroy(m_Context);
@@ -846,6 +900,7 @@ void App::CreateResources()
 		m_AlbedoView->Destroy(m_Context);
 		m_MaterialImage->Destroy(m_Context);
 		m_MaterialView->Destroy(m_Context);
+		m_HDRIRenderTarget->Destroy(m_Context);
 	});
 }
 
@@ -908,10 +963,12 @@ void App::RecreateSwapchain()
 	m_AlbedoView->Destroy(m_Context);
 	m_MaterialImage->Destroy(m_Context);
 	m_MaterialView->Destroy(m_Context);
+	m_HDRIRenderTarget->Destroy(m_Context);
 
 	CreateSwapchain();
 	CreateDepth();
 	CreateGBuffer();
+	m_HDRIRenderTarget = std::make_unique<HDRIRenderTarget>(m_Context);
 	m_Camera->SetNewAspectRatio(static_cast<float>(m_Context.Swapchain.extent.width)
 								/ m_Context.Swapchain.extent.height); // NOLINT(*-narrowing-conversions)
 
@@ -924,6 +981,7 @@ void App::RecordCommandBuffer(vkc::CommandBuffer& commandBuffer, size_t imageInd
 	DoDepthPrepass(commandBuffer, imageIndex);
 	DoGBufferPass(commandBuffer, imageIndex);
 	DoLightingPass(commandBuffer, imageIndex);
+	DoBlitPass(commandBuffer, imageIndex);
 	commandBuffer.End(m_Context);
 }
 
@@ -966,16 +1024,19 @@ void App::End()
 	m_Context.DeletionQueue.Flush();
 }
 
-void App::DoLightingPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
+void App::DoBlitPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
 {
 	VkDebugUtilsLabelEXT debugLabel{};
 	debugLabel.sType      = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
-	debugLabel.pLabelName = "lighting pass";
+	debugLabel.pLabelName = "blit pass";
 	static float constexpr color[4]{ .23f, 1.f, .65f, 1.f };
 	for (size_t index{}; index < std::size(debugLabel.color); ++index)
 		debugLabel.color[index] = color[index];
 	m_Context.DispatchTable.cmdBeginDebugUtilsLabelEXT(commandBuffer, &debugLabel);
+
 	vkc::Image& swapchainImage = m_SwapchainImages[imageIndex];
+
+	auto hdrimages = m_HDRIRenderTarget->GetImages();
 	// swapchain image to attachment optimal
 	{
 		vkc::Image::Transition transition{};
@@ -1000,6 +1061,118 @@ void App::DoLightingPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
 			transition.DstStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
 			transition.NewLayout     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		}
+		for (auto& image: hdrimages)
+			image.MakeTransition(m_Context, commandBuffer, transition);
+	}
+
+	VkRenderingAttachmentInfo renderingAttachmentInfo{};
+	renderingAttachmentInfo.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+	renderingAttachmentInfo.clearValue  = { { .03f, .03f, .03f, 1.f } };
+	renderingAttachmentInfo.imageLayout = m_SwapchainImages[imageIndex].GetLayout();
+	renderingAttachmentInfo.imageView   = m_SwapchainImageViews[imageIndex];
+	renderingAttachmentInfo.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	renderingAttachmentInfo.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
+
+	VkRenderingInfo renderingInfo{};
+	renderingInfo.sType                = VK_STRUCTURE_TYPE_RENDERING_INFO;
+	renderingInfo.colorAttachmentCount = 1;
+	renderingInfo.pColorAttachments    = &renderingAttachmentInfo;
+	renderingInfo.layerCount           = 1;
+	renderingInfo.renderArea           = VkRect2D{ {}, m_Context.Swapchain.extent };
+
+	m_Context.DispatchTable.cmdBeginRendering(commandBuffer, &renderingInfo);
+	// render
+	{
+		VkViewport viewport{};
+		viewport.width    = static_cast<float>(m_Context.Swapchain.extent.width);
+		viewport.height   = static_cast<float>(m_Context.Swapchain.extent.height);
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+
+		m_Context.DispatchTable.cmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+		VkRect2D scissor{};
+		scissor.offset = { 0, 0 };
+		scissor.extent = m_Context.Swapchain.extent;
+
+		m_Context.DispatchTable.cmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+		VkDescriptorSet const sets[]{
+			m_GlobalDescriptorSets[m_CurrentFrame]
+			, m_GbufferDescriptorSets[m_CurrentFrame]
+		};
+
+		m_Context.DispatchTable.cmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *m_BlitPipeline);
+		m_Context.DispatchTable.cmdBindDescriptorSets(commandBuffer
+													  , VK_PIPELINE_BIND_POINT_GRAPHICS
+													  , *m_BlitPipelineLayout
+													  , 0
+													  , static_cast<uint32_t>(std::size(sets))
+													  , sets
+													  , 0
+													  , nullptr);
+		uint32_t index = m_HDRIRenderTarget->GetCurrentImageIndex();
+		m_Context.DispatchTable.cmdPushConstants(commandBuffer
+												 , *m_BlitPipelineLayout
+												 , VK_SHADER_STAGE_FRAGMENT_BIT
+												 , 0
+												 , sizeof(uint32_t)
+												 , &index);
+
+		m_Context.DispatchTable.cmdDraw(commandBuffer, 3, 1, 0, 0);
+	}
+	m_Context.DispatchTable.cmdEndRendering(commandBuffer);
+
+	// swapchain image to present
+	{
+		vkc::Image::Transition transition{};
+		//
+		{
+			transition.SrcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+			transition.DstAccessMask = VK_ACCESS_2_NONE;
+			transition.SrcStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+			transition.DstStageMask  = VK_PIPELINE_STAGE_2_NONE;
+			transition.NewLayout     = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		}
+		swapchainImage.MakeTransition(m_Context, commandBuffer, transition);
+	}
+	m_Context.DispatchTable.cmdEndDebugUtilsLabelEXT(commandBuffer);
+}
+
+void App::DoLightingPass(vkc::CommandBuffer& commandBuffer, size_t) const
+{
+	VkDebugUtilsLabelEXT debugLabel{};
+	debugLabel.sType      = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+	debugLabel.pLabelName = "lighting pass";
+	static float constexpr color[4]{ .23f, 1.f, .65f, 1.f };
+	for (size_t index{}; index < std::size(debugLabel.color); ++index)
+		debugLabel.color[index] = color[index];
+	m_Context.DispatchTable.cmdBeginDebugUtilsLabelEXT(commandBuffer, &debugLabel);
+	auto [renderImage, renderImageView] = m_HDRIRenderTarget->AcquireNextTarget();
+	// render image to attachment optimal
+	{
+		vkc::Image::Transition transition{};
+		//
+		{
+			transition.SrcAccessMask = VK_ACCESS_2_NONE;
+			transition.DstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			transition.SrcStageMask  = VK_PIPELINE_STAGE_2_NONE;
+			transition.DstStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+			transition.NewLayout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		}
+		renderImage->MakeTransition(m_Context, commandBuffer, transition);
+	}
+	// gbuffer images to read only optimal
+	{
+		vkc::Image::Transition transition{};
+		//
+		{
+			transition.SrcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+			transition.DstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT;
+			transition.SrcStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+			transition.DstStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+			transition.NewLayout     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		}
 		m_AlbedoImage->MakeTransition(m_Context, commandBuffer, transition);
 		m_MaterialImage->MakeTransition(m_Context, commandBuffer, transition);
 		m_DepthImage->MakeTransition(m_Context, commandBuffer, transition);
@@ -1008,8 +1181,8 @@ void App::DoLightingPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
 	VkRenderingAttachmentInfo renderingAttachmentInfo{};
 	renderingAttachmentInfo.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
 	renderingAttachmentInfo.clearValue  = { { .03f, .03f, .03f, 1.f } };
-	renderingAttachmentInfo.imageLayout = m_SwapchainImages[imageIndex].GetLayout();
-	renderingAttachmentInfo.imageView   = m_SwapchainImageViews[imageIndex];
+	renderingAttachmentInfo.imageLayout = renderImage->GetLayout();
+	renderingAttachmentInfo.imageView   = *renderImageView;
 	renderingAttachmentInfo.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	renderingAttachmentInfo.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
 
@@ -1056,20 +1229,6 @@ void App::DoLightingPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
 		m_Context.DispatchTable.cmdDraw(commandBuffer, 3, 1, 0, 0);
 	}
 	m_Context.DispatchTable.cmdEndRendering(commandBuffer);
-
-	// swapchain image to present
-	{
-		vkc::Image::Transition transition{};
-		//
-		{
-			transition.SrcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-			transition.DstAccessMask = VK_ACCESS_2_NONE;
-			transition.SrcStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-			transition.DstStageMask  = VK_PIPELINE_STAGE_2_NONE;
-			transition.NewLayout     = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-		}
-		swapchainImage.MakeTransition(m_Context, commandBuffer, transition);
-	}
 	m_Context.DispatchTable.cmdEndDebugUtilsLabelEXT(commandBuffer);
 }
 

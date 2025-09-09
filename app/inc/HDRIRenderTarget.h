@@ -17,11 +17,36 @@ public:
 	HDRIRenderTarget& operator=(HDRIRenderTarget&&)      = delete;
 	HDRIRenderTarget& operator=(HDRIRenderTarget const&) = delete;
 
-	vkc::ImageView& AcquireNextImageView();
+	[[nodiscard]] std::pair<vkc::Image*, vkc::ImageView*> AcquireNextTarget();
+
+	[[nodiscard]] std::pair<vkc::Image*, vkc::ImageView*> AcquireCurrentTarget();
+
+	[[nodiscard]] std::pair<vkc::Image*, vkc::ImageView*> AcquireLastRenderedToTarget();
+
+	[[nodiscard]] uint32_t GetCurrentImageIndex() const
+	{
+		assert(HasBeenRenderedTo());
+		return static_cast<uint32_t>(m_ImageIndex);
+	}
+
+	[[nodiscard]] std::span<vkc::ImageView> GetViews()
+	{
+		return m_ImageViews;
+	}
+
+	[[nodiscard]] std::span<vkc::Image> GetImages()
+	{
+		return m_Images;
+	}
 
 	[[nodiscard]] bool HasBeenRenderedTo() const
 	{
 		return m_ImageIndex >= 0;
+	}
+
+	[[nodiscard]] VkFormat GetFormat() const
+	{
+		return m_Images[0].GetFormat();
 	}
 
 	void Destroy(vkc::Context const& context) const;

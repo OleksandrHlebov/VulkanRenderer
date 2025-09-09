@@ -38,7 +38,8 @@ set(SHADER_SOURCES
     "gbuffer_generation.frag"
     "lighting.frag"
     "quad.vert"
-    "frag_depth_override.frag")
+    "frag_depth_override.frag"
+    "blit.frag")
 
 set(HEADER
     inc/helper.h

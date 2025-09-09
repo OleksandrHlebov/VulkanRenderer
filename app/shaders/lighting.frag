@@ -169,31 +169,15 @@ void main()
 
         const float illuminance = luminousIntensity * attenuation;
 
-        //        // get vector between fragment position and light position
-        //        vec3 fragToLight = worldPosition - lights[lightIndex].position.xyz;
-        //        // use the light to fragment vector to sample from the depth map
-        //        float closestDepth = texture(samplerCube(cubemaps[lights[lightIndex].shadowMapIndex], shadowSampler), fragToLight).r;
-        //        // it is currently in linear range between [0,1]. Re-transform back to original value
-        //        closestDepth *= SHADOW_FAR_PLANE;
-        //        // now get current linear depth as the length between the fragment and light position
-        //        float currentDepth = length(fragToLight);
-        //        // now test for shadows
-        //        float bias = 0.05;
-        //        float shadow = currentDepth -  bias > closestDepth ? 1.0 : 0.0;
-
         vec3 fragToLight =  -lights[lightIndex].position.xyz + worldPosition;
         float currentDepth = length(fragToLight) / SHADOW_FAR_PLANE;
         float shadow = texture(samplerCubeShadow(cubemaps[lights[lightIndex].shadowMapIndex], shadowSampler), vec4(fragToLight, currentDepth)).r;
-        //        outColour = vec4(vec3(shadow), 1.f);
-        //        return;
 
         Lo += shadow * CalculateLight(viewDirection, lightDirection, normal, lights[lightIndex].colour.rgb, albedoColour.rgb, roughness, metalness, illuminance);
     }
 
     vec3 ambient = vec3(.03f) * albedoColour.rgb;
     vec3 colour = ambient + Lo;
-    colour = colour / (colour + vec3(1.0));
-    colour = pow(colour, vec3(1.0/2.2));
 
     outColour = vec4(colour, 1.f);
 }

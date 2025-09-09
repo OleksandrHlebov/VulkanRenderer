@@ -10,6 +10,7 @@
 #include "descriptor_set.h"
 #include "descriptor_pool.h"
 #include "descriptor_set_layout.h"
+#include "HDRIRenderTarget.h"
 #include "VkBootstrap.h"
 
 class Scene;
@@ -51,7 +52,6 @@ private:
 	void CreateSyncObjects();
 	void CreateDescriptorPool();
 	void UpdateGbufferDescriptor();
-	void CreateFrameDescriptorSet();
 	void CreateDescriptorSets();
 	void CreateGraphicsPipeline();
 	void CreateCmdPool();
@@ -66,7 +66,8 @@ private:
 	void Present(uint32_t imageIndex);
 	void End();
 
-	void DoLightingPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex);
+	void DoBlitPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex);
+	void DoLightingPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex) const;
 	void DoGBufferPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex) const;
 	void DoDepthPrepass(vkc::CommandBuffer const& commandBuffer, size_t imageIndex) const;
 
@@ -91,6 +92,9 @@ private:
 	uptr<vkc::PipelineLayout> m_LightingPipelineLayout;
 	uptr<vkc::Pipeline>       m_LightingPipeline{};
 
+	uptr<vkc::PipelineLayout> m_BlitPipelineLayout;
+	uptr<vkc::Pipeline>       m_BlitPipeline{};
+
 	VkFormat             m_DepthFormat{};
 	uptr<vkc::Image>     m_DepthImage{};
 	uptr<vkc::ImageView> m_DepthImageView{};
@@ -100,6 +104,8 @@ private:
 
 	uptr<vkc::Image>     m_MaterialImage{};
 	uptr<vkc::ImageView> m_MaterialView{};
+
+	uptr<HDRIRenderTarget> m_HDRIRenderTarget{};
 
 	VkSampler m_TextureSampler{};
 	VkSampler m_ShadowSampler{};
