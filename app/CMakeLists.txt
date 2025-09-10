@@ -61,7 +61,15 @@ set(SOURCE
 
 add_library(App STATIC
             ${SOURCE}
-            ${HEADER})
+            ${HEADER}
+            ${imgui_SOURCE_DIR}/imgui.cpp
+            ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+            ${imgui_SOURCE_DIR}/imgui_tables.cpp
+            ${imgui_SOURCE_DIR}/imgui_draw.cpp
+            ${imgui_SOURCE_DIR}/imgui_demo.cpp
+            ${imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp
+            ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+            ${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib.cpp)
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
                            GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -76,7 +84,8 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
 target_include_directories(${PROJECT_NAME} PRIVATE
                            ${CMAKE_CURRENT_SOURCE_DIR}/inc
                            ${CMAKE_CURRENT_SOURCE_DIR}/src
-                           ${stb_SOURCE_DIR})
+                           ${stb_SOURCE_DIR}
+                           ${imgui_SOURCE_DIR})
 target_include_directories(${PROJECT_NAME} PUBLIC
                            ${CMAKE_CURRENT_SOURCE_DIR})
 

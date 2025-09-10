@@ -9,6 +9,10 @@
 #include "shadow_generation.h"
 #include "shader_stage.h"
 
+#include "imgui.h"
+#include "backends/imgui_impl_glfw.h"
+#include "backends/imgui_impl_vulkan.h"
+
 #include <span>
 #include <ranges>
 
@@ -44,6 +48,7 @@ App::App(int width, int height)
 	CreateSyncObjects();
 	CreateDescriptorPool();
 	CreateDescriptorSets();
+	InitImGUI();
 	GenerateShadowMaps();
 }
 
@@ -79,6 +84,7 @@ void App::Run()
 		m_Context.DispatchTable.resetFences(1, &m_InFlightFences[m_CurrentFrame]);
 
 		RecordCommandBuffer(commandBuffer, imageIndex);
+
 		Submit(commandBuffer);
 
 		Present(imageIndex);
@@ -91,6 +97,36 @@ void App::Run()
 		throw std::runtime_error("Failed to wait for the device");
 
 	End();
+}
+
+void App::InitImGUI() const
+{
+	ImGui::CreateContext();
+	ImGui_ImplGlfw_InitForVulkan(m_Context.Window, true);
+	ImGui_ImplVulkan_InitInfo initInfo{};
+	initInfo.ApiVersion          = VK_API_VERSION_1_3;
+	initInfo.Instance            = m_Context.Instance;
+	initInfo.PhysicalDevice      = m_PhysicalDevice.physical_device;
+	initInfo.Device              = m_Context.Device;
+	initInfo.QueueFamily         = m_Context.Device.get_queue_index(vkb::QueueType::graphics).value();
+	initInfo.Queue               = m_Context.GraphicsQueue;
+	initInfo.DescriptorPool      = *m_DescPool;
+	initInfo.MinImageCount       = m_FramesInFlight;
+	initInfo.ImageCount          = m_FramesInFlight;
+	initInfo.UseDynamicRendering = true;
+	VkPipelineRenderingCreateInfo pipelineRendering{};
+	pipelineRendering.sType                   = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+	pipelineRendering.colorAttachmentCount    = 1;
+	pipelineRendering.pColorAttachmentFormats = &m_Context.Swapchain.image_format;
+	pipelineRendering.depthAttachmentFormat   = m_DepthFormat;
+	pipelineRendering.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+	initInfo.PipelineRenderingCreateInfo      = pipelineRendering;
+	ImGui_ImplVulkan_Init(&initInfo);
+}
+
+void App::DrawImGui()
+{
+	ImGui::Text("Hello, world %d", 123);
 }
 
 void App::CreateWindow(int width, int height)
@@ -179,6 +215,8 @@ void App::CreateDevice()
 											  , { VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT }
 											  , VK_IMAGE_TILING_OPTIMAL
 											  , VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+
+	m_PhysicalDevice = physicalDeviceResult.value();
 
 	auto const deviceResult = vkb::DeviceBuilder{ physicalDeviceResult.value() }.build();
 	if (!deviceResult)
@@ -506,6 +544,7 @@ void App::CreateDescriptorPool()
 {
 	vkc::DescriptorPoolBuilder builder{ m_Context };
 	vkc::DescriptorPool        pool = builder
+							   .SetFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT)
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, m_FramesInFlight) // mvp
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, m_FramesInFlight) // light data
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, m_FramesInFlight) // light data
@@ -517,7 +556,8 @@ void App::CreateDescriptorPool()
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)  // depth
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)  // shadow maps
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)  // hdri
-							   .Build(3 * m_FramesInFlight);
+							   .AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1)        // imgui
+							   .Build(4 * m_FramesInFlight);
 
 	m_DescPool = std::make_unique<vkc::DescriptorPool>(std::move(pool));
 }
@@ -1021,6 +1061,9 @@ void App::Present(uint32_t imageIndex)
 
 void App::End()
 {
+	ImGui_ImplVulkan_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
 	m_Context.DeletionQueue.Flush();
 }
 
@@ -1121,6 +1164,14 @@ void App::DoBlitPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
 
 		m_Context.DispatchTable.cmdDraw(commandBuffer, 3, 1, 0, 0);
 	}
+
+	ImGui_ImplVulkan_NewFrame();
+	ImGui_ImplGlfw_NewFrame();
+	ImGui::NewFrame();
+	DrawImGui();
+	ImGui::Render();
+	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+
 	m_Context.DispatchTable.cmdEndRendering(commandBuffer);
 
 	// swapchain image to present

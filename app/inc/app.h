@@ -44,6 +44,8 @@ public:
 	static float constexpr SHADOW_FAR_PLANE = 100.0f;
 
 private:
+	void InitImGUI() const;
+	void DrawImGui();
 	void CreateWindow(int width, int height);
 	void CreateInstance();
 	void CreateSurface();
@@ -72,6 +74,8 @@ private:
 	void DoDepthPrepass(vkc::CommandBuffer const& commandBuffer, size_t imageIndex) const;
 
 	Config m_Config;
+
+	vkb::PhysicalDevice m_PhysicalDevice;
 
 	uptr<Camera> m_Camera;
 	vkc::Context m_Context{};

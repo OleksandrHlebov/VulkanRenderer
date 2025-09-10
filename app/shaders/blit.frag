@@ -1,7 +1,6 @@
 #version 450
 #extension GL_EXT_nonuniform_qualifier : require
 #extension GL_EXT_samplerless_texture_functions : require
-#define INDOOR
 
 layout(location = 0) out vec4 outColour;
 layout(location = 0) in vec2 inUV;

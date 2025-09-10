@@ -11,6 +11,11 @@ FetchContent_Declare(
 		URL https://github.com/g-truc/glm/archive/refs/tags/1.0.1.tar.gz)
 FetchContent_MakeAvailable(glm)
 
+FetchContent_Declare(
+		imgui
+		URL https://github.com/ocornut/imgui/archive/refs/tags/v1.92.2b.tar.gz)
+FetchContent_MakeAvailable(imgui)
+
 set(BUILD_SHARED_LIBS ON)
 
 FetchContent_Declare(
