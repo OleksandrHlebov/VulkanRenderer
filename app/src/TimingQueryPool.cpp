@@ -1,5 +1,6 @@
 #include "TimingQueryPool.h"
 #include <ratio>
+#include <limits>
 
 TimingQueryPool::TimingQueryPool(vkc::Context const& context, float timeStampPeriod, uint32_t maxQueries)
 	: m_TimestampPeriod{ timeStampPeriod }
