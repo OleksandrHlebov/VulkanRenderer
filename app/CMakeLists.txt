@@ -57,7 +57,9 @@ set(SOURCE
     src/world_time.cpp
     src/scene.cpp
     src/mesh.cpp
-    src/HDRIRenderTarget.cpp)
+    src/HDRIRenderTarget.cpp
+    src/TimingQueryPool.cpp
+    inc/TimingQueryPool.h)
 
 add_library(App STATIC
             ${SOURCE}

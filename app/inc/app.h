@@ -12,6 +12,9 @@
 #include "descriptor_set_layout.h"
 #include "HDRIRenderTarget.h"
 #include "VkBootstrap.h"
+#include "TimingQueryPool.h"
+
+#include <map>
 
 class Scene;
 
@@ -73,7 +76,10 @@ private:
 	void DoGBufferPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex) const;
 	void DoDepthPrepass(vkc::CommandBuffer const& commandBuffer, size_t imageIndex) const;
 
-	Config m_Config;
+	Config                m_Config;
+	uptr<TimingQueryPool> m_QueryPool;
+	Timings               m_GPUTimings;
+	Timings               m_CPUTimings;
 
 	vkb::PhysicalDevice m_PhysicalDevice;
 
