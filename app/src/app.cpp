@@ -164,9 +164,11 @@ void App::DrawImGui()
 
 			for (auto const& [stage, duration]: m_CPUTimings)
 			{
+				auto const labelBegin = stage.find(' ') + 1; // find where tag ends
+				assert(labelBegin < stage.size());
 				ImGui::TableNextRow();
 				ImGui::TableSetColumnIndex(0);
-				ImGui::TextUnformatted(std::next(stage.c_str(), 2)); // std::next() to omit order tag
+				ImGui::TextUnformatted(stage.substr(labelBegin).c_str());
 
 				ImGui::TableSetColumnIndex(1);
 				ImGui::Text("%.4f", duration);
@@ -187,17 +189,19 @@ void App::DrawImGui()
 
 			for (auto const& [stage, duration]: m_GPUTimings)
 			{
+				auto const labelBegin = stage.find(' ') + 1; // find where tag ends
+				assert(labelBegin < stage.size());
 				ImGui::TableNextRow();
 				ImGui::TableSetColumnIndex(0);
-				ImGui::TextUnformatted(std::next(stage.c_str(), 2)); // std::next() to omit order tag
+				ImGui::TextUnformatted(stage.substr(labelBegin).c_str());
 
 				ImGui::TableSetColumnIndex(1);
 
 				float constexpr minMs = .1f;
 				float constexpr maxMs = .5f;
 
-				float t = static_cast<float>((duration - minMs) / (maxMs - minMs));
-				t       = std::clamp(t, 0.0f, 1.0f);
+				auto t = static_cast<float>((duration - minMs) / (maxMs - minMs));
+				t      = std::clamp(t, 0.0f, 1.0f);
 
 				ImVec4 constexpr green(0.3f, 1.0f, 0.3f, 1.0f);
 				ImVec4 constexpr red(1.0f, 0.3f, 0.3f, 1.0f);
