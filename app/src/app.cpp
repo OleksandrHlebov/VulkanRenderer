@@ -14,17 +14,20 @@
 #include "backends/imgui_impl_vulkan.h"
 
 #include <span>
+#include <chrono>
+#include <ranges>
 
 #include "scene.h"
-#include <chrono>
+
+#include "image_view.h"
 
 App::App(int width, int height)
 {
 	auto const start = std::chrono::steady_clock::now();
+	double     initDuration{};
 	//
 	{
-		auto const localStart = std::chrono::steady_clock::now();
-		m_Camera              = std::make_unique<Camera>(glm::vec3(.0f, .0f, .0f)
+		m_Camera = std::make_unique<Camera>(glm::vec3(.0f, .0f, .0f)
 											, 45.f
 											, static_cast<float>(width) / height // NOLINT(*-narrowing-conversions)
 											, .01f
@@ -44,15 +47,15 @@ App::App(int width, int height)
 			vkb::destroy_swapchain(m_Context.Swapchain);
 		});
 		CreateCmdPool();
-		auto const end                 = std::chrono::steady_clock::now();
-		m_CPUTimings["#1 Vulkan init"] = std::chrono::duration<double>(end - localStart).count();
+		auto const end = std::chrono::steady_clock::now();
+		initDuration   = std::chrono::duration<double>(end - start).count();
 	}
 	//
 	{
 		auto const localStart = std::chrono::steady_clock::now();
 		CreateScene();
-		auto const end                = std::chrono::steady_clock::now();
-		m_CPUTimings["#2 Scene load"] = std::chrono::duration<double>(end - localStart).count();
+		auto const end  = std::chrono::steady_clock::now();
+		m_CPUTimings[2] = Timing{ "Scene load", std::chrono::duration<double>(end - localStart).count() };
 	}
 	//
 	{
@@ -64,10 +67,11 @@ App::App(int width, int height)
 		CreateDescriptorPool();
 		CreateDescriptorSets();
 		auto const end = std::chrono::steady_clock::now();
-		m_CPUTimings["#1 Vulkan init"] += std::chrono::duration<double>(end - localStart).count();
+		initDuration += std::chrono::duration<double>(end - localStart).count();
 	}
-	auto const end                = std::chrono::steady_clock::now();
-	m_CPUTimings["#3 Total init"] = std::chrono::duration<double>(end - start).count();
+	auto const end  = std::chrono::steady_clock::now();
+	m_CPUTimings[1] = Timing{ "Vulkan init", initDuration };
+	m_CPUTimings[3] = Timing{ "Total init", std::chrono::duration<double>(end - start).count() };
 	InitImGUI();
 	GenerateShadowMaps();
 }
@@ -114,8 +118,8 @@ void App::Run()
 
 		++m_CurrentFrame;
 		m_CurrentFrame %= m_FramesInFlight;
-		auto const end                    = std::chrono::steady_clock::now();
-		m_CPUTimings["#5 CPU frame time"] = std::chrono::duration<double>(end - start).count();
+		auto const end  = std::chrono::steady_clock::now();
+		m_CPUTimings[5] = Timing{ "CPU frame time", std::chrono::duration<double>(end - start).count() };
 	}
 
 	if (m_Context.DispatchTable.deviceWaitIdle() != VK_SUCCESS)
@@ -162,16 +166,14 @@ void App::DrawImGui()
 			ImGui::TableSetupColumn("Duration (s)", ImGuiTableColumnFlags_WidthFixed, 120.0f);
 			ImGui::TableHeadersRow();
 
-			for (auto const& [stage, duration]: m_CPUTimings)
+			for (auto const& timing: m_CPUTimings | std::views::values)
 			{
-				auto const labelBegin = stage.find(' ') + 1; // find where tag ends
-				assert(labelBegin < stage.size());
 				ImGui::TableNextRow();
 				ImGui::TableSetColumnIndex(0);
-				ImGui::TextUnformatted(stage.substr(labelBegin).c_str());
+				ImGui::TextUnformatted(timing.GetLabel().data());
 
 				ImGui::TableSetColumnIndex(1);
-				ImGui::Text("%.4f", duration);
+				ImGui::Text("%.4f", timing.GetDuration());
 			}
 			ImGui::EndTable();
 		}
@@ -187,15 +189,15 @@ void App::DrawImGui()
 			ImGui::TableSetupColumn("Duration (ms)", ImGuiTableColumnFlags_WidthFixed, 120.0f);
 			ImGui::TableHeadersRow();
 
-			for (auto const& [stage, duration]: m_GPUTimings)
+			for (auto const& timing: m_GPUTimings | std::views::values)
 			{
-				auto const labelBegin = stage.find(' ') + 1; // find where tag ends
-				assert(labelBegin < stage.size());
 				ImGui::TableNextRow();
 				ImGui::TableSetColumnIndex(0);
-				ImGui::TextUnformatted(stage.substr(labelBegin).c_str());
+				ImGui::TextUnformatted(timing.GetLabel().data());
 
 				ImGui::TableSetColumnIndex(1);
+
+				double const duration = timing.GetDuration();
 
 				float constexpr minMs = .1f;
 				float constexpr maxMs = .5f;
@@ -537,8 +539,8 @@ void App::GenerateShadowMaps()
 		vkc::CommandBuffer& commandBuffer = m_CommandPool->AllocateCommandBuffer(m_Context);
 		commandBuffer.Begin(m_Context, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 		m_QueryPool->Reset(commandBuffer);
-		std::string const label{ "#0 Shadow generation" };
-		m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, label);
+		std::string const label{ "Shadow generation" };
+		m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, label, 0);
 		VkDescriptorSet descSets[]{ m_GlobalDescriptorSets[m_CurrentFrame] };
 
 		FrameData const pointLightData{
@@ -567,7 +569,7 @@ void App::GenerateShadowMaps()
 												   , directionalShadowMaps
 												   , directionalShadowMapViews
 												   , directionalLightData);
-		m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, label);
+		m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, label, 0);
 
 		commandBuffer.End(m_Context);
 		commandBuffer.Submit(m_Context, m_Context.GraphicsQueue, {}, {});
@@ -1117,13 +1119,13 @@ void App::RecordCommandBuffer(vkc::CommandBuffer& commandBuffer, size_t imageInd
 {
 	commandBuffer.Begin(m_Context);
 	m_QueryPool->Reset(commandBuffer);
-	std::string const label{ "#1 total GPU time" };
-	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, label);
+	std::string const label{ "total GPU time" };
+	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, label, 1);
 	DoDepthPrepass(commandBuffer, imageIndex);
 	DoGBufferPass(commandBuffer, imageIndex);
 	DoLightingPass(commandBuffer, imageIndex);
 	DoBlitPass(commandBuffer, imageIndex);
-	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, label);
+	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, label, 1);
 	commandBuffer.End(m_Context);
 }
 
@@ -1171,8 +1173,8 @@ void App::End()
 
 void App::DoBlitPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
 {
-	std::string const label{ "#5 Blit pass" };
-	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, label);
+	std::string const label{ "Blit pass" };
+	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, label, 5);
 	VkDebugUtilsLabelEXT debugLabel{};
 	debugLabel.sType      = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
 	debugLabel.pLabelName = "blit pass";
@@ -1292,13 +1294,13 @@ void App::DoBlitPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
 		swapchainImage.MakeTransition(m_Context, commandBuffer, transition);
 	}
 	m_Context.DispatchTable.cmdEndDebugUtilsLabelEXT(commandBuffer);
-	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, label);
+	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, label, 5);
 }
 
 void App::DoLightingPass(vkc::CommandBuffer& commandBuffer, size_t) const
 {
-	std::string const label{ "#4 Lighting pass" };
-	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, label);
+	std::string const label{ "Lighting pass" };
+	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, label, 4);
 	VkDebugUtilsLabelEXT debugLabel{};
 	debugLabel.sType      = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
 	debugLabel.pLabelName = "lighting pass";
@@ -1388,13 +1390,13 @@ void App::DoLightingPass(vkc::CommandBuffer& commandBuffer, size_t) const
 	}
 	m_Context.DispatchTable.cmdEndRendering(commandBuffer);
 	m_Context.DispatchTable.cmdEndDebugUtilsLabelEXT(commandBuffer);
-	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, label);
+	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, label, 4);
 }
 
 void App::DoGBufferPass(vkc::CommandBuffer& commandBuffer, size_t) const
 {
-	std::string const label{ "#3 GBuffer generation" };
-	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, label);
+	std::string const label{ "GBuffer generation" };
+	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, label, 3);
 	VkDebugUtilsLabelEXT debugLabel{};
 	debugLabel.sType      = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
 	debugLabel.pLabelName = "gbuffer generation";
@@ -1533,13 +1535,13 @@ void App::DoGBufferPass(vkc::CommandBuffer& commandBuffer, size_t) const
 	}
 	m_Context.DispatchTable.cmdEndRendering(commandBuffer);
 	m_Context.DispatchTable.cmdEndDebugUtilsLabelEXT(commandBuffer);
-	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, label);
+	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, label, 3);
 }
 
 void App::DoDepthPrepass(vkc::CommandBuffer const& commandBuffer, size_t) const
 {
-	std::string const label{ "#2 Depth prepass" };
-	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, label);
+	std::string const label{ "Depth prepass" };
+	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, label, 2);
 	VkDebugUtilsLabelEXT debugLabel{};
 	debugLabel.sType      = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
 	debugLabel.pLabelName = label.c_str();
@@ -1635,5 +1637,5 @@ void App::DoDepthPrepass(vkc::CommandBuffer const& commandBuffer, size_t) const
 	}
 	m_Context.DispatchTable.cmdEndRendering(commandBuffer);
 	m_Context.DispatchTable.cmdEndDebugUtilsLabelEXT(commandBuffer);
-	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, label);
+	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, label, 2);
 }

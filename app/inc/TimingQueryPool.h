@@ -5,6 +5,30 @@
 #include "command_buffer.h"
 #include <map>
 
+class Timing
+{
+public:
+	Timing() = default;
+
+	Timing(std::string const& label, double duration)
+		: m_Label{ label }
+		, m_Duration{ duration } {}
+
+	double GetDuration() const
+	{
+		return m_Duration;
+	}
+
+	std::string_view GetLabel() const
+	{
+		return m_Label;
+	}
+
+private:
+	std::string m_Label;
+	double      m_Duration;
+};
+
 class TimingsCompare
 {
 public:
@@ -17,7 +41,7 @@ public:
 	}
 };
 
-using Timings = std::map<std::string, double, TimingsCompare>;
+using Timings = std::map<int, Timing>;
 
 class TimingQueryPool
 {
@@ -37,15 +61,23 @@ public:
 
 	void Reset(vkc::CommandBuffer const& commandBuffer);
 
-	void WriteTimestamp(vkc::CommandBuffer const& commandBuffer, VkPipelineStageFlagBits stage, std::string const& label);
+	void WriteTimestamp(vkc::CommandBuffer const& commandBuffer, VkPipelineStageFlagBits stage, std::string const& label, int priority);
 
 	void GetResults(vkc::Context const& context, Timings& outResult);
 
 private:
-	VkQueryPool                                                    m_QueryPool{};
-	std::vector<uint64_t>                                          m_Timestamps;
-	std::unordered_map<std::string, std::pair<uint32_t, uint32_t>> m_LabeledResults;
-	float                                                          m_TimestampPeriod;
+	struct InternalTiming
+	{
+		std::string                   Label;
+		std::pair<uint32_t, uint32_t> TimestampIndices;
+
+		Timing CalculateTiming(std::vector<uint64_t> const& timestamps, float period) const;
+	};
+
+	VkQueryPool                   m_QueryPool{};
+	std::vector<uint64_t>         m_Timestamps;
+	std::map<int, InternalTiming> m_LabeledResults;
+	float                         m_TimestampPeriod;
 };
 
 #endif //VULKANRESEARCH_TIMINGQUERYPOOL_H
