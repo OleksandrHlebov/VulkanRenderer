@@ -14,19 +14,19 @@ public:
 		: m_Label{ label }
 		, m_Duration{ duration } {}
 
-	double GetDuration() const
+	[[nodiscard]] double GetDuration() const
 	{
 		return m_Duration;
 	}
 
-	std::string_view GetLabel() const
+	[[nodiscard]] std::string_view GetLabel() const
 	{
 		return m_Label;
 	}
 
 private:
-	std::string m_Label;
-	double      m_Duration;
+	std::string m_Label{};
+	double      m_Duration{};
 };
 
 class TimingsCompare
@@ -65,13 +65,25 @@ public:
 
 	void GetResults(vkc::Context const& context, Timings& outResult);
 
+	template<typename FunctionType, typename... Args>
+	void RecordWholePipe
+	(
+		vkc::CommandBuffer const& commandBuffer, std::string const& label, int priority
+		, FunctionType            function, Args&&...               args
+	)
+	{
+		WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, label, priority);
+		function(std::forward<Args>(args)...);
+		WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, label, priority);
+	}
+
 private:
 	struct InternalTiming
 	{
 		std::string                   Label;
 		std::pair<uint32_t, uint32_t> TimestampIndices;
 
-		Timing CalculateTiming(std::vector<uint64_t> const& timestamps, float period) const;
+		[[nodiscard]] Timing CalculateTiming(std::vector<uint64_t> const& timestamps, float period) const;
 	};
 
 	VkQueryPool                   m_QueryPool{};

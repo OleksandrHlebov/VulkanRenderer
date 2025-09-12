@@ -110,7 +110,17 @@ void App::Run()
 		vkc::CommandBuffer& commandBuffer = m_CommandPool->AllocateCommandBuffer(m_Context);
 		m_Context.DispatchTable.resetFences(1, &m_InFlightFences[m_CurrentFrame]);
 
-		RecordCommandBuffer(commandBuffer, imageIndex);
+		using namespace std::placeholders;
+		commandBuffer.Begin(m_Context);
+		m_QueryPool->Reset(commandBuffer);
+		m_QueryPool->RecordWholePipe(commandBuffer
+									 , "Total GPU frametime"
+									 , -1
+									 , [this, &commandBuffer, imageIndex]
+									 {
+										 RecordCommandBuffer(commandBuffer, imageIndex);
+									 });
+		commandBuffer.End(m_Context);
 
 		Submit(commandBuffer);
 
@@ -1117,16 +1127,35 @@ void App::RecreateSwapchain()
 
 void App::RecordCommandBuffer(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
 {
-	commandBuffer.Begin(m_Context);
-	m_QueryPool->Reset(commandBuffer);
-	std::string const label{ "total GPU time" };
-	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, label, 1);
-	DoDepthPrepass(commandBuffer, imageIndex);
-	DoGBufferPass(commandBuffer, imageIndex);
-	DoLightingPass(commandBuffer, imageIndex);
-	DoBlitPass(commandBuffer, imageIndex);
-	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, label, 1);
-	commandBuffer.End(m_Context);
+	using namespace std::placeholders;
+	m_QueryPool->RecordWholePipe(commandBuffer
+								 , "Depth prepass"
+								 , 0
+								 , [this, &commandBuffer, imageIndex]
+								 {
+									 DoDepthPrepass(commandBuffer, imageIndex);
+								 });
+	m_QueryPool->RecordWholePipe(commandBuffer
+								 , "GBuffer generation"
+								 , 1
+								 , [this, &commandBuffer, imageIndex]
+								 {
+									 DoGBufferPass(commandBuffer, imageIndex);
+								 });
+	m_QueryPool->RecordWholePipe(commandBuffer
+								 , "Lighting pass"
+								 , 2
+								 , [this, &commandBuffer, imageIndex]
+								 {
+									 DoLightingPass(commandBuffer, imageIndex);
+								 });
+	m_QueryPool->RecordWholePipe(commandBuffer
+								 , "Blit pass"
+								 , 3
+								 , [this, &commandBuffer, imageIndex]
+								 {
+									 DoBlitPass(commandBuffer, imageIndex);
+								 });
 }
 
 void App::Submit(vkc::CommandBuffer& commandBuffer) const
@@ -1173,8 +1202,6 @@ void App::End()
 
 void App::DoBlitPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
 {
-	std::string const label{ "Blit pass" };
-	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, label, 5);
 	VkDebugUtilsLabelEXT debugLabel{};
 	debugLabel.sType      = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
 	debugLabel.pLabelName = "blit pass";
@@ -1294,13 +1321,10 @@ void App::DoBlitPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
 		swapchainImage.MakeTransition(m_Context, commandBuffer, transition);
 	}
 	m_Context.DispatchTable.cmdEndDebugUtilsLabelEXT(commandBuffer);
-	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, label, 5);
 }
 
 void App::DoLightingPass(vkc::CommandBuffer& commandBuffer, size_t) const
 {
-	std::string const label{ "Lighting pass" };
-	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, label, 4);
 	VkDebugUtilsLabelEXT debugLabel{};
 	debugLabel.sType      = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
 	debugLabel.pLabelName = "lighting pass";
@@ -1390,13 +1414,10 @@ void App::DoLightingPass(vkc::CommandBuffer& commandBuffer, size_t) const
 	}
 	m_Context.DispatchTable.cmdEndRendering(commandBuffer);
 	m_Context.DispatchTable.cmdEndDebugUtilsLabelEXT(commandBuffer);
-	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, label, 4);
 }
 
 void App::DoGBufferPass(vkc::CommandBuffer& commandBuffer, size_t) const
 {
-	std::string const label{ "GBuffer generation" };
-	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, label, 3);
 	VkDebugUtilsLabelEXT debugLabel{};
 	debugLabel.sType      = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
 	debugLabel.pLabelName = "gbuffer generation";
@@ -1535,13 +1556,11 @@ void App::DoGBufferPass(vkc::CommandBuffer& commandBuffer, size_t) const
 	}
 	m_Context.DispatchTable.cmdEndRendering(commandBuffer);
 	m_Context.DispatchTable.cmdEndDebugUtilsLabelEXT(commandBuffer);
-	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, label, 3);
 }
 
 void App::DoDepthPrepass(vkc::CommandBuffer const& commandBuffer, size_t) const
 {
-	std::string const label{ "Depth prepass" };
-	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, label, 2);
+	std::string const    label{ "Depth prepass" };
 	VkDebugUtilsLabelEXT debugLabel{};
 	debugLabel.sType      = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
 	debugLabel.pLabelName = label.c_str();
@@ -1637,5 +1656,4 @@ void App::DoDepthPrepass(vkc::CommandBuffer const& commandBuffer, size_t) const
 	}
 	m_Context.DispatchTable.cmdEndRendering(commandBuffer);
 	m_Context.DispatchTable.cmdEndDebugUtilsLabelEXT(commandBuffer);
-	m_QueryPool->WriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, label, 2);
 }
