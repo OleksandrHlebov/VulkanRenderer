@@ -48,7 +48,7 @@ set(HEADER
     inc/world_time.h
     inc/scene.h
     inc/mesh.h
-    inc/HDRIRenderTarget.h
+    inc/HDRI_render_target.h
     inc/shadow_generation.h)
 
 set(SOURCE
@@ -57,9 +57,9 @@ set(SOURCE
     src/world_time.cpp
     src/scene.cpp
     src/mesh.cpp
-    src/HDRIRenderTarget.cpp
-    src/TimingQueryPool.cpp
-    inc/TimingQueryPool.h)
+    src/HDRI_render_target.cpp
+    src/timing_query_pool.cpp
+    inc/timing_query_pool.h)
 
 add_library(App STATIC
             ${SOURCE}

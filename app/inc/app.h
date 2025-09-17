@@ -10,9 +10,9 @@
 #include "descriptor_set.h"
 #include "descriptor_pool.h"
 #include "descriptor_set_layout.h"
-#include "HDRIRenderTarget.h"
+#include "HDRI_render_target.h"
 #include "VkBootstrap.h"
-#include "TimingQueryPool.h"
+#include "timing_query_pool.h"
 
 #include <map>
 

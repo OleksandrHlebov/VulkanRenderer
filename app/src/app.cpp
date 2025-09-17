@@ -990,11 +990,11 @@ void App::CreateScene()
 {
 	m_Scene = std::make_unique<Scene>(m_Context, *m_CommandPool);
 	m_Scene->Load("data/glTF/Sponza.gltf");
-	m_Scene->AddLight(-glm::normalize(glm::vec3{ 0.577f, -0.577f, -0.577f }), false, { .877f, .877f, .577f }, 100.f);
+	m_Scene->AddLight(-glm::normalize(glm::vec3{ 0.3f, -0.4f, -0.f }), false, { .877f, .877f, .577f }, 100.f);
 	// m_Scene->AddLight(-glm::normalize(glm::vec3{ .999f, -.577f, .0f }), false, { .877f, .877f, .3f }, 50.f);
-	m_Scene->AddLight({ -2.f, 1.f, .0f }, true, { 1.f, .0f, .0f }, 125.f);
-	m_Scene->AddLight({ -6.f, 1.f, .0f }, true, { .0f, 1.f, .0f }, 75.f);
-	m_Scene->AddLight({ 6.f, 1.f, .0f }, true, { .666f, .533f, .12f }, 75.f);
+	// m_Scene->AddLight({ -2.f, 1.f, .0f }, true, { 1.f, .0f, .0f }, 125.f);
+	// m_Scene->AddLight({ -6.f, 1.f, .0f }, true, { .0f, 1.f, .0f }, 75.f);
+	// m_Scene->AddLight({ 6.f, 1.f, .0f }, true, { .666f, .533f, .12f }, 75.f);
 	std::cout << (m_Scene->ContainsPBRInfo() ? "scene contains pbr info" : "scene does not contain pbr info") << std::endl;
 }
 

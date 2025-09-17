@@ -1,4 +1,4 @@
-#include "HDRIRenderTarget.h"
+#include "HDRI_render_target.h"
 
 #include "helper.h"
 
