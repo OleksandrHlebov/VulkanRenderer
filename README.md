@@ -17,6 +17,7 @@ Renderer made using Vulkan 1.3, utilising own [vulkan wrapper library](https://g
     * **Blit pass** tonemapping HDR to LDR, physics based camera exposure
 * **Lighting** featuring point lights and directional lights, with pregenerated during initialisation shadows maps for both.
 * **Pool queries** used to acquire GPU timings to display for profiling purposes
+* **Pipeline cache**
 
 # Screenshots
 
