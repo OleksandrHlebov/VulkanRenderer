@@ -8,6 +8,7 @@
 #include "image.h"
 #include "shadow_generation.h"
 #include "shader_stage.h"
+#include "pipeline_cache.h"
 
 #include "imgui.h"
 #include "backends/imgui_impl_glfw.h"
@@ -20,6 +21,33 @@
 #include "scene.h"
 
 #include "image_view.h"
+
+void App::CreatePipelineCache()
+{
+	try
+	{
+		if (std::vector cache = help::ReadFile(std::format("data/pipelines_{}_{}.cache"
+														   , m_PhysicalDevice.properties.deviceID
+														   , help::UUIDToHex(m_PhysicalDevice.properties.pipelineCacheUUID)));
+			!cache.empty())
+		{
+			vkc::PipelineCache::Data const cacheData{ std::move(cache) };
+			m_PipelineCache = std::make_unique<
+				vkc::PipelineCache>(m_Context, std::span{ cacheData.Cache }, VkPipelineCacheCreateFlagBits{});
+		}
+	}
+	catch (const std::runtime_error&)
+	{
+		std::cerr << "Cache not found. Generating new pipeline cache" << std::endl;
+		m_PipelineCache = std::make_unique<vkc::PipelineCache>(m_Context
+															   , std::span<char>{}
+															   , VkPipelineCacheCreateFlagBits{});
+	}
+	m_Context.DeletionQueue.Push([this]
+	{
+		m_PipelineCache->Destroy(m_Context);
+	});
+}
 
 App::App(int width, int height)
 {
@@ -36,6 +64,7 @@ App::App(int width, int height)
 		CreateInstance();
 		CreateSurface();
 		CreateDevice();
+		CreatePipelineCache();
 		CreateSwapchain();
 		m_Context.DeletionQueue.Push([this]
 		{
@@ -886,6 +915,7 @@ void App::CreateGraphicsPipeline()
 								 .SetCullMode(VK_CULL_MODE_BACK_BIT)
 								 .SetFrontFace(VK_FRONT_FACE_COUNTER_CLOCKWISE)
 								 .SetVertexDescription(Vertex::GetBindingDescription(), Vertex::GetAttributeDescription())
+								 .UseCache(*m_PipelineCache)
 								 .AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT)
 								 .AddDynamicState(VK_DYNAMIC_STATE_SCISSOR)
 								 .SetRenderingAttachments({}, m_DepthFormat, VK_FORMAT_UNDEFINED)
@@ -911,6 +941,7 @@ void App::CreateGraphicsPipeline()
 								 .SetCullMode(VK_CULL_MODE_BACK_BIT)
 								 .SetFrontFace(VK_FRONT_FACE_COUNTER_CLOCKWISE)
 								 .SetVertexDescription(Vertex::GetBindingDescription(), Vertex::GetAttributeDescription())
+								 .UseCache(*m_PipelineCache)
 								 .AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT)
 								 .AddDynamicState(VK_DYNAMIC_STATE_SCISSOR)
 								 .AddColorBlendAttachment(blendAttachment)
@@ -948,6 +979,7 @@ void App::CreateGraphicsPipeline()
 								 .AddDynamicState(VK_DYNAMIC_STATE_SCISSOR)
 								 .AddColorBlendAttachment(blendAttachment)
 								 .SetRenderingAttachments(colorAttachmentFormats, m_DepthFormat, VK_FORMAT_UNDEFINED)
+								 .UseCache(*m_PipelineCache)
 								 .AddShaderStage(quad)
 								 .AddShaderStage(lighting)
 								 .Build(*m_LightingPipelineLayout, true);
@@ -971,6 +1003,7 @@ void App::CreateGraphicsPipeline()
 								 .AddDynamicState(VK_DYNAMIC_STATE_SCISSOR)
 								 .AddColorBlendAttachment(blendAttachment)
 								 .SetRenderingAttachments(colorAttachmentFormats, m_DepthFormat, VK_FORMAT_UNDEFINED)
+								 .UseCache(*m_PipelineCache)
 								 .AddShaderStage(quad)
 								 .AddShaderStage(blit)
 								 .Build(*m_BlitPipelineLayout, true);
@@ -1194,6 +1227,15 @@ void App::Present(uint32_t imageIndex)
 
 void App::End()
 {
+	auto const    cache = m_PipelineCache->AcquireCache(m_Context);
+	std::ofstream cacheOutput{
+		std::format("data/pipelines_{}_{}.cache"
+					, m_PhysicalDevice.properties.deviceID
+					, help::UUIDToHex(m_PhysicalDevice.properties.pipelineCacheUUID))
+		, std::ios::binary | std::ios::out
+	};
+	cacheOutput.write(cache.Cache.data(), cache.Cache.size() * sizeof(cache.Cache[0]));
+
 	ImGui_ImplVulkan_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();

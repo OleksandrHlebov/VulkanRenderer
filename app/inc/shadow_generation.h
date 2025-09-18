@@ -7,7 +7,10 @@
 namespace shadow
 {
 	inline std::pair<vkc::PipelineLayout, vkc::Pipeline> CreatePipelineForDirectionalShadows
-	(vkc::Context& context, vkc::DescriptorSetLayout const& descSetLayout, VkFormat depthFormat, VkExtent2D shadowRes)
+	(
+		vkc::Context&         context, vkc::DescriptorSetLayout const& descSetLayout, VkFormat depthFormat, VkExtent2D shadowRes
+		, vkc::PipelineCache* cache = nullptr
+	)
 	{
 		vkc::PipelineLayoutBuilder layoutBuilder{ context };
 		vkc::PipelineLayout        directionalPipelineLayout = layoutBuilder
@@ -22,7 +25,9 @@ namespace shadow
 		vkc::ShaderStage const frag{ context, help::ReadFile("shaders/alpha_discard.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
 
 		vkc::PipelineBuilder pipelineBuilder{ context };
-		vkc::Pipeline        directionalPipeline = pipelineBuilder
+		if (cache)
+			pipelineBuilder.UseCache(*cache);
+		vkc::Pipeline directionalPipeline = pipelineBuilder
 											.AddShaderStage(vert)
 											.AddShaderStage(frag)
 											.AddViewport(shadowRes)
@@ -42,7 +47,10 @@ namespace shadow
 	}
 
 	inline std::pair<vkc::PipelineLayout, vkc::Pipeline> CreatePipelineForPointShadows
-	(vkc::Context& context, vkc::DescriptorSetLayout const& descSetLayout, VkFormat depthFormat, VkExtent2D shadowRes)
+	(
+		vkc::Context&         context, vkc::DescriptorSetLayout const& descSetLayout, VkFormat depthFormat, VkExtent2D shadowRes
+		, vkc::PipelineCache* cache = nullptr
+	)
 	{
 		vkc::ShaderStage vert{ context, help::ReadFile("shaders/transform_to_lightspace.spv"), VK_SHADER_STAGE_VERTEX_BIT };
 		vkc::ShaderStage depthOverride{ context, help::ReadFile("shaders/frag_depth_override.spv"), VK_SHADER_STAGE_FRAGMENT_BIT };
@@ -55,7 +63,9 @@ namespace shadow
 												  .AddDescriptorSetLayout(descSetLayout)
 												  .Build(false);
 		vkc::PipelineBuilder pipelineBuilder{ context };
-		vkc::Pipeline        pointPipeline = pipelineBuilder
+		if (cache)
+			pipelineBuilder.UseCache(*cache);
+		vkc::Pipeline pointPipeline = pipelineBuilder
 									  .AddShaderStage(vert)
 									  .AddShaderStage(depthOverride)
 									  .AddViewport(shadowRes)

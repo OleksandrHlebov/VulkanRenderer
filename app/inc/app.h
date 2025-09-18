@@ -34,6 +34,7 @@ public:
 	using uptr = std::unique_ptr<T>;
 
 	void CreateScene();
+	void CreatePipelineCache();
 	App(int width, int height);
 	~App();
 
@@ -92,6 +93,8 @@ private:
 	uptr<vkc::DescriptorSetLayout> m_GlobalDescSetLayout{};
 	uptr<vkc::DescriptorSetLayout> m_GbufferDescSetLayout{};
 	uptr<vkc::DescriptorPool>      m_DescPool{};
+
+	uptr<vkc::PipelineCache> m_PipelineCache{};
 
 	uptr<vkc::PipelineLayout> m_DepthPrepPipelineLayout;
 	uptr<vkc::Pipeline>       m_DepthPrepPipeline{};

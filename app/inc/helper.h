@@ -1,15 +1,17 @@
 #ifndef HELPER_H
 #define HELPER_H
+#include <format>
 #include <fstream>
 #include <string>
 #include <vector>
+#include <span>
 
 #include "vulkan/vulkan_core.h"
 #include "Context.h"
 
 namespace help
 {
-	inline std::vector<char> ReadFile(const std::string& filename)
+	[[nodiscard]] inline std::vector<char> ReadFile(const std::string& filename)
 	{
 		std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
@@ -25,6 +27,16 @@ namespace help
 		file.close();
 
 		return buffer;
+	}
+
+	[[nodiscard]] inline std::string UUIDToHex(std::span<std::uint8_t> uuidBytes)
+	{
+		std::string result;
+		result.reserve(uuidBytes.size() * 2);
+		for (auto b: uuidBytes)
+			result += std::format("{:02x}", b);
+
+		return result;
 	}
 
 	inline VkFormat FindSupportedFormat
