@@ -36,8 +36,6 @@ Renderer made using Vulkan 1.3, utilising own [vulkan wrapper library](https://g
 - Roughness (.g value)![roughness](screenshots/roughness.png)
 - Metalness (.a value)![metalness](screenshots/metalness.png)
 
-### Depth ![depth](screenshots/depth.png)
-
 # Libraries used
 
 [vulkan-classes](https://github.com/OleksandrHlebov/vulkan-classes)
