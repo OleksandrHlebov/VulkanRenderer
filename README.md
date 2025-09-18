@@ -22,21 +22,19 @@ Renderer made using Vulkan 1.3, utilising own [vulkan wrapper library](https://g
 
 ### Point lights
 
-![img.png](screenshots/point_light.png)
+<img src="screenshots/point_light.png" alt="normals" width="720"/>
 
 ### Directional light
 
-![img.png](screenshots/directional_light.png)
+<img src="screenshots/directional_light.png" alt="normals" width="720"/>
 
 ### Material image featuring encoded normals
 
-![normals-material](screenshots/gbuffer-normals-material.png)
+<img src="screenshots/gbuffer-normals-material.png" alt="normals-material" width="720"/>
 
-- Encoded normals (.rg values)![normals](screenshots/normals.png)
-- Roughness (.g value)![roughness](screenshots/roughness.png)
-- Metalness (.a value)![metalness](screenshots/metalness.png)
-
-### Depth ![depth](screenshots/depth.png)
+- Encoded normals (.rg values)<img src="screenshots/normals.png" alt="normals" width="720"/>
+- Roughness (.g value)<img src="screenshots/roughness.png" alt="roughness" width="720"/>
+- Metalness (.a value)<img src="screenshots/metalness.png" alt="metalness" width="720"/>
 
 # Libraries used
 
