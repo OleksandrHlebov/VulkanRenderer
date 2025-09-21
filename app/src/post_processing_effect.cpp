@@ -1,4 +1,5 @@
 #include "post_processing_effect.h"
+
 #include "pipeline.h"
 #include "pipeline_layout.h"
 #include "descriptor_set.h"
@@ -6,6 +7,8 @@
 #include "image.h"
 #include "helper.h"
 #include "pingpong_render_target.h"
+#include "spirv_reflect.h"
+#include "../../cmake-build-release-visual-studio/_deps/imgui-src/imgui.h"
 
 PostProcessingEffect::PostProcessingEffect
 (
@@ -17,21 +20,66 @@ PostProcessingEffect::PostProcessingEffect
 {
 	//
 	{
-		vkc::PipelineLayoutBuilder builder{ context };
+		std::unordered_map<std::string, float> defaultValues;
+		std::filesystem::path configPath{ std::filesystem::path{ "data/configs/" } / (shaderPath.stem().string() + ".ini") };
+		if (std::ifstream file{ configPath })
+		{
+			std::string line;
+			std::getline(file, line);
+			assert(line == "[Config]");
+			for (std::string varName; std::getline(file, varName, '=');)
+			{
+				std::string value;
+				std::getline(file, value);
+				defaultValues[varName] = std::stof(value);
+			}
+		}
+		else
+			throw std::runtime_error("Can't read shader config " + m_Name);
 
-		m_PipelineLayout = std::make_unique<vkc::PipelineLayout>(builder
-																 .AddDescriptorSetLayout(descriptorData.GlobalSetLayout)
-																 .AddDescriptorSetLayout(descriptorData.GBufferSetLayout)
-																 .AddPushConstant(VK_SHADER_STAGE_FRAGMENT_BIT
-																				  , 0
-																				  , sizeof(uint64_t) + sizeof(uint32_t))
-																 .Build());
-	}
-
-	//
-	{
+		std::vector      effectCode = help::ReadFile(shaderPath.string());
 		vkc::ShaderStage quad{ context, help::ReadFile("shaders/quad.spv"), VK_SHADER_STAGE_VERTEX_BIT };
-		vkc::ShaderStage effect{ context, help::ReadFile(shaderPath.string()), VK_SHADER_STAGE_FRAGMENT_BIT };
+		vkc::ShaderStage effect{ context, effectCode, VK_SHADER_STAGE_FRAGMENT_BIT };
+
+		SpvReflectShaderModule shaderModule;
+		spvReflectCreateShaderModule2(SPV_REFLECT_MODULE_FLAG_NONE, effectCode.size(), effectCode.data(), &shaderModule);
+
+		uint32_t blockCount{};
+		spvReflectEnumeratePushConstantBlocks(&shaderModule, &blockCount, nullptr);
+		std::vector<SpvReflectBlockVariable*> blockVariables;
+		blockVariables.resize(blockCount);
+		spvReflectEnumeratePushConstantBlocks(&shaderModule, &blockCount, blockVariables.data());
+		assert(blockCount == 1 && "only 1 push constant block is supported");
+		for (auto& blockVariable: blockVariables)
+		{
+			m_PushConstants.resize(blockVariable->size);
+			m_ShaderVariables.reserve(blockVariable->member_count);
+			// first 2 expected to be time and array index
+			for (uint32_t memberIndex{ 2 }; memberIndex < blockVariable->member_count; ++memberIndex)
+			{
+				auto& member = blockVariable->members[memberIndex];
+				m_ShaderVariables.emplace_back(member.name
+											   , member.type_description->type_flags
+											   , blockVariable->type_description->traits.numeric.scalar.signedness
+											   , &m_PushConstants[member.offset]);
+				std::memcpy(m_ShaderVariables[memberIndex - 2].DataAddress, &(defaultValues[member.name]), sizeof(float));
+			}
+		}
+
+		spvReflectDestroyShaderModule(&shaderModule);
+		//
+		{
+			vkc::PipelineLayoutBuilder builder{ context };
+
+			m_PipelineLayout = std::make_unique<vkc::PipelineLayout>(builder
+																	 .AddDescriptorSetLayout(descriptorData.GlobalSetLayout)
+																	 .AddDescriptorSetLayout(descriptorData.GBufferSetLayout)
+																	 .AddPushConstant(VK_SHADER_STAGE_FRAGMENT_BIT
+																					  , 0
+																					  , static_cast<uint32_t>(m_PushConstants.size()
+																						  * sizeof(m_PushConstants[0])))
+																	 .Build());
+		}
 
 		VkFormat colorAttachmentFormats[1]{};
 		switch (type)
@@ -68,8 +116,6 @@ PostProcessingEffect::PostProcessingEffect
 								 .Build(*m_PipelineLayout, true);
 		m_Pipeline = std::make_unique<vkc::Pipeline>(std::move(pipeline));
 	}
-
-	m_PushConstants.resize(sizeof(uint64_t) + sizeof(uint32_t));
 }
 
 void PostProcessingEffect::Render
@@ -167,7 +213,8 @@ void PostProcessingEffect::Render
 													, sets
 													, 0
 													, nullptr);
-		uint64_t time  = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+		uint64_t time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).
+			count();
 		uint32_t index = renderData.PingPongTarget.GetLastImageIndex();
 		std::memcpy(m_PushConstants.data(), &time, sizeof(time));
 		std::memcpy(std::next(m_PushConstants.data(), sizeof(time)), &index, sizeof(index));
@@ -182,4 +229,15 @@ void PostProcessingEffect::Render
 	}
 	context.DispatchTable.cmdEndRendering(commandBuffer);
 	// context.DispatchTable.cmdEndDebugUtilsLabelEXT(commandBuffer);
+}
+
+void PostProcessingEffect::DrawImGUI()
+{
+	if (ImGui::CollapsingHeader(m_Name.c_str()))
+	{
+		for (auto& shaderVariable: m_ShaderVariables)
+		{
+			ImGui::SliderFloat(shaderVariable.Name.c_str(), reinterpret_cast<float*>(shaderVariable.DataAddress), .0f, 1.f);
+		}
+	}
 }

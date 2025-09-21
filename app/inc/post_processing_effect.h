@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "spirv_reflect.h"
+
 class PingPongRenderTarget;
 
 namespace vkc
@@ -27,6 +29,14 @@ public:
 	enum class Type
 	{
 		SDR, HDR
+	};
+
+	struct ShaderVariable
+	{
+		std::string               Name;
+		SpvReflectTypeFlags const Type;
+		bool                      IsSigned;
+		char* const               DataAddress;
 	};
 
 	struct DescriptorData
@@ -65,6 +75,8 @@ public:
 		, uint32_t    frameIndex, bool             renderToSwapchain
 	);
 
+	void DrawImGUI();
+
 	std::string const& GetName() const
 	{
 		return m_Name;
@@ -77,8 +89,9 @@ private:
 	uptr<vkc::Pipeline>       m_Pipeline;
 	uptr<vkc::PipelineLayout> m_PipelineLayout;
 
-	DescriptorData    m_DescriptorData;
-	std::vector<char> m_PushConstants;
+	DescriptorData              m_DescriptorData;
+	std::vector<char>           m_PushConstants;
+	std::vector<ShaderVariable> m_ShaderVariables;
 };
 
 #endif //VULKANRESEARCH_POSTPROCESSINGEFFECT_H

@@ -5,9 +5,9 @@
 layout (location = 0) in vec2 inUV;
 
 layout (location = 0) out vec4 outColour;
-
-float grainAmount = .05f;
-float grainSize = .5f;
+//
+//float grainAmount = .05f;
+//float grainSize = .5f;
 
 // references used for randomness
 // https://amindforeverprogramming.blogspot.com/2013/07/random-floats-in-glsl-330.html
@@ -51,6 +51,8 @@ layout (push_constant) uniform constants
 {
     uint64_t time;
     uint lastImageIndex;
+    float grainAmount;
+    float grainSize;
 };
 
 void main()

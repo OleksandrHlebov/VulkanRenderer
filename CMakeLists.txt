@@ -16,6 +16,13 @@ FetchContent_Declare(
 		URL https://github.com/ocornut/imgui/archive/refs/tags/v1.92.2b.tar.gz)
 FetchContent_MakeAvailable(imgui)
 
+FetchContent_Declare(
+		SPIRVReflect
+		URL https://github.com/KhronosGroup/SPIRV-Reflect/archive/refs/tags/vulkan-sdk-1.3.296.0.tar.gz
+		)
+set(SPIRV_REFLECT_STATIC_LIB ON)
+FetchContent_MakeAvailable(SPIRVReflect)
+
 set(BUILD_SHARED_LIBS ON)
 
 FetchContent_Declare(

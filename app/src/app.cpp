@@ -260,6 +260,9 @@ void App::DrawImGui()
 			ImGui::EndTable();
 		}
 	}
+	for (auto& ppeffect: m_SDREffects)
+		ppeffect.DrawImGUI();
+
 	ImGui::End();
 	ImGui::PopStyleVar();
 	ImGui::PopStyleVar();

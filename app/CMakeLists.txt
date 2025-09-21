@@ -85,7 +85,8 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 target_link_libraries(${PROJECT_NAME} PUBLIC
                       VulkanClasses
                       glm::glm
-                      assimp::assimp)
+                      assimp::assimp
+                      spirv-reflect-static)
 
 target_include_directories(${PROJECT_NAME} PRIVATE
                            ${CMAKE_CURRENT_SOURCE_DIR}/inc
