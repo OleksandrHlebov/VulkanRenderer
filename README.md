@@ -1,4 +1,4 @@
-[![Windows Build](https://github.com/OleksandrHlebov/VulkanRenderer/actions/workflows/cmake-single-platform.yml/badge.svg?branch=master)](https://github.com/OleksandrHlebov/VulkanRenderer/actions/workflows/cmake-single-platform.yml)
+[![Windows Build](https://github.com/OleksandrHlebov/VulkanRenderer/actions/workflows/cmake-single-platform.yml/badge.svg)](https://github.com/OleksandrHlebov/VulkanRenderer/actions/workflows/cmake-single-platform.yml)
 
 # PBR Vulkan Renderer
 
