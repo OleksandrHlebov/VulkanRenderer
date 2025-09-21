@@ -16,6 +16,7 @@
 
 #include <span>
 #include <chrono>
+#include <filesystem>
 #include <ranges>
 
 #include "scene.h"
@@ -95,6 +96,7 @@ App::App(int width, int height)
 		CreateSyncObjects();
 		CreateDescriptorPool();
 		CreateDescriptorSets();
+		LoadPostProcessingEffects();
 		auto const end = std::chrono::steady_clock::now();
 		initDuration += std::chrono::duration<double>(end - localStart).count();
 	}
@@ -314,6 +316,8 @@ void App::CreateSurface()
 
 void App::CreateDevice()
 {
+	VkPhysicalDeviceFeatures deviceFeatures{};
+	deviceFeatures.shaderInt64 = VK_TRUE;
 	VkPhysicalDeviceVulkan11Features features11{};
 	features11.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
 	VkPhysicalDeviceVulkan12Features features12{};
@@ -338,6 +342,7 @@ void App::CreateDevice()
 									  .add_required_extension_features(features11)
 									  .add_required_extension_features(features12)
 									  .add_required_extension_features(features13)
+									  .set_required_features(deviceFeatures)
 									  .add_required_extensions(extensions)
 									  .set_minimum_version(1, 3)
 									  .set_surface(m_Context.Surface)
@@ -462,7 +467,16 @@ void App::CreateDescriptorSetLayouts()
 										  .AddBinding(0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
 										  .AddBinding(1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
 										  .AddBinding(2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT)
-										  .AddBinding(3, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT, 2)
+										  .AddBinding(3
+													  , VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
+													  , VK_SHADER_STAGE_FRAGMENT_BIT
+													  , 2
+													  , VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT)
+										  .AddBinding(4
+													  , VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
+													  , VK_SHADER_STAGE_FRAGMENT_BIT
+													  , 2
+													  , VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT)
 										  .Build();
 
 		m_GbufferDescSetLayout = std::make_unique<vkc::DescriptorSetLayout>(std::move(layout));
@@ -512,6 +526,26 @@ void App::CreateDescriptorSetLayouts()
 						 , VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT
 						 , "global descriptor set layout");
 	}
+}
+
+void App::LoadPostProcessingEffects()
+{
+	PostProcessingEffect::DescriptorData descriptorData{
+		.GBufferSetLayout = *m_GbufferDescSetLayout
+		, .GBufferSet = m_GbufferDescriptorSets
+		, .GlobalSetLayout = *m_GlobalDescSetLayout
+		, .GlobalSet = m_GlobalDescriptorSets
+	};
+	for (auto const& entry: std::filesystem::directory_iterator("shaders/sdr_post_processing/"))
+		if (entry.path().has_filename())
+		{
+			std::cout << "found shader entry: " << entry.path().stem() << std::endl;
+			m_SDREffects.emplace_back(m_Context
+									  , descriptorData
+									  , *m_PipelineCache
+									  , PostProcessingEffect::Type::SDR
+									  , entry.path());
+		}
 }
 
 void App::GenerateShadowMaps()
@@ -695,6 +729,7 @@ void App::CreateDescriptorPool()
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)  // depth
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)  // shadow maps
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)  // hdri
+							   .AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, m_FramesInFlight)  // sdri
 							   .AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1)        // imgui
 							   .Build(4 * m_FramesInFlight);
 
@@ -727,6 +762,15 @@ void App::UpdateGbufferDescriptor()
 		HDRIInfo[index].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		HDRIInfo[index].imageView   = hdriViews[index];
 	}
+	auto const sdrViews = m_SDRRenderTarget->GetViews();
+
+	VkDescriptorImageInfo SDRInfo[2]{};
+	for (int index{}; index < 2; ++index)
+	{
+		SDRInfo[index].sampler     = VK_NULL_HANDLE;
+		SDRInfo[index].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		SDRInfo[index].imageView   = sdrViews[index];
+	}
 
 	for (uint32_t index{}; index < m_FramesInFlight; ++index)
 	{
@@ -735,6 +779,7 @@ void App::UpdateGbufferDescriptor()
 			.AddWriteDescriptor({ &normalsInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, 0)
 			.AddWriteDescriptor({ &depthInfo, 1 }, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 2, 0)
 			.AddWriteDescriptor(HDRIInfo, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 3, 0)
+			.AddWriteDescriptor(SDRInfo, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 4, 0)
 			.Update(m_Context);
 	}
 }
@@ -1074,7 +1119,6 @@ void App::CreateResources()
 	}
 	CreateDepth();
 	CreateGBuffer();
-	m_HDRIRenderTarget = std::make_unique<HDRIRenderTarget>(m_Context);
 	m_Context.DeletionQueue.Push([this]
 	{
 		m_DepthImage->Destroy(m_Context);
@@ -1084,6 +1128,7 @@ void App::CreateResources()
 		m_MaterialImage->Destroy(m_Context);
 		m_MaterialView->Destroy(m_Context);
 		m_HDRIRenderTarget->Destroy(m_Context);
+		m_SDRRenderTarget->Destroy(m_Context);
 	});
 }
 
@@ -1110,6 +1155,9 @@ void App::CreateGBuffer()
 
 	m_MaterialImage = std::make_unique<vkc::Image>(std::move(image));
 	m_MaterialView  = std::make_unique<vkc::ImageView>(std::move(view));
+
+	m_HDRIRenderTarget = std::make_unique<PingPongRenderTarget>(m_Context, VK_FORMAT_R32G32B32A32_SFLOAT);
+	m_SDRRenderTarget  = std::make_unique<PingPongRenderTarget>(m_Context, m_Context.Swapchain.image_format);
 }
 
 void App::CreateDepth()
@@ -1147,11 +1195,11 @@ void App::RecreateSwapchain()
 	m_MaterialImage->Destroy(m_Context);
 	m_MaterialView->Destroy(m_Context);
 	m_HDRIRenderTarget->Destroy(m_Context);
+	m_SDRRenderTarget->Destroy(m_Context);
 
 	CreateSwapchain();
 	CreateDepth();
 	CreateGBuffer();
-	m_HDRIRenderTarget = std::make_unique<HDRIRenderTarget>(m_Context);
 	m_Camera->SetNewAspectRatio(static_cast<float>(m_Context.Swapchain.extent.width)
 								/ m_Context.Swapchain.extent.height); // NOLINT(*-narrowing-conversions)
 
@@ -1161,34 +1209,59 @@ void App::RecreateSwapchain()
 void App::RecordCommandBuffer(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
 {
 	using namespace std::placeholders;
+	int shaderPriority{};
 	m_QueryPool->RecordWholePipe(commandBuffer
 								 , "Depth prepass"
-								 , 0
+								 , shaderPriority++
 								 , [this, &commandBuffer, imageIndex]
 								 {
 									 DoDepthPrepass(commandBuffer, imageIndex);
 								 });
 	m_QueryPool->RecordWholePipe(commandBuffer
 								 , "GBuffer generation"
-								 , 1
+								 , shaderPriority++
 								 , [this, &commandBuffer, imageIndex]
 								 {
 									 DoGBufferPass(commandBuffer, imageIndex);
 								 });
 	m_QueryPool->RecordWholePipe(commandBuffer
 								 , "Lighting pass"
-								 , 2
+								 , shaderPriority++
 								 , [this, &commandBuffer, imageIndex]
 								 {
 									 DoLightingPass(commandBuffer, imageIndex);
 								 });
 	m_QueryPool->RecordWholePipe(commandBuffer
 								 , "Blit pass"
-								 , 3
+								 , shaderPriority++
 								 , [this, &commandBuffer, imageIndex]
 								 {
 									 DoBlitPass(commandBuffer, imageIndex);
 								 });
+
+	DoPostProcessing(commandBuffer, imageIndex, shaderPriority);
+
+	m_QueryPool->RecordWholePipe(commandBuffer
+								 , "Imgui pass"
+								 , shaderPriority++
+								 , [this, &commandBuffer, imageIndex]
+								 {
+									 DoImGUIPass(commandBuffer, imageIndex);
+								 });
+
+	// swapchain image to present
+	{
+		vkc::Image::Transition transition{};
+		//
+		{
+			transition.SrcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+			transition.DstAccessMask = VK_ACCESS_2_NONE;
+			transition.SrcStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+			transition.DstStageMask  = VK_PIPELINE_STAGE_2_NONE;
+			transition.NewLayout     = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		}
+		m_SwapchainImages[imageIndex].MakeTransition(m_Context, commandBuffer, transition);
+	}
 }
 
 void App::Submit(vkc::CommandBuffer& commandBuffer) const
@@ -1242,21 +1315,50 @@ void App::End()
 	m_Context.DeletionQueue.Flush();
 }
 
-void App::DoBlitPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
+void App::DoPostProcessing(vkc::CommandBuffer& commandBuffer, size_t imageIndex, int& priority)
 {
 	VkDebugUtilsLabelEXT debugLabel{};
 	debugLabel.sType      = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
-	debugLabel.pLabelName = "blit pass";
+	debugLabel.pLabelName = "post processing";
+	static float constexpr color[4]{ .23f, 1.f, .65f, 1.f };
+	for (size_t index{}; index < std::size(debugLabel.color); ++index)
+		debugLabel.color[index] = color[index];
+	m_Context.DispatchTable.cmdBeginDebugUtilsLabelEXT(commandBuffer, &debugLabel);
+	PostProcessingEffect::RenderData renderData
+	{
+		.SwapchainImage = m_SwapchainImages[imageIndex]
+		, .SwapchainImageView = m_SwapchainImageViews[imageIndex]
+		, .PingPongTarget = *m_SDRRenderTarget
+	};
+	for (auto& ppeffect: m_SDREffects)
+		m_QueryPool->RecordWholePipe(commandBuffer
+									 , ppeffect.GetName()
+									 , priority++
+									 , [this, &commandBuffer, &renderData, &ppeffect]
+									 {
+										 ppeffect.Render(m_Context
+														 , commandBuffer
+														 , renderData
+														 , m_CurrentFrame
+														 , &ppeffect == &m_SDREffects.back());
+									 });
+
+	m_Context.DispatchTable.cmdEndDebugUtilsLabelEXT(commandBuffer);
+}
+
+void App::DoImGUIPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
+{
+	VkDebugUtilsLabelEXT debugLabel{};
+	debugLabel.sType      = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+	debugLabel.pLabelName = "imgui pass";
 	static float constexpr color[4]{ .23f, 1.f, .65f, 1.f };
 	for (size_t index{}; index < std::size(debugLabel.color); ++index)
 		debugLabel.color[index] = color[index];
 	m_Context.DispatchTable.cmdBeginDebugUtilsLabelEXT(commandBuffer, &debugLabel);
 
-	vkc::Image& swapchainImage = m_SwapchainImages[imageIndex];
-
-	auto hdrimages = m_HDRIRenderTarget->GetImages();
 	// swapchain image to attachment optimal
 	{
+		vkc::Image&            swapchainImage = m_SwapchainImages[imageIndex];
 		vkc::Image::Transition transition{};
 		//
 		{
@@ -1267,6 +1369,61 @@ void App::DoBlitPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
 			transition.NewLayout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		}
 		swapchainImage.MakeTransition(m_Context, commandBuffer, transition);
+	}
+
+	VkRenderingAttachmentInfo renderingAttachmentInfo{};
+	renderingAttachmentInfo.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+	renderingAttachmentInfo.clearValue  = { { .03f, .03f, .03f, 1.f } };
+	renderingAttachmentInfo.imageLayout = m_SwapchainImages[imageIndex].GetLayout();
+	renderingAttachmentInfo.imageView   = m_SwapchainImageViews[imageIndex];
+	renderingAttachmentInfo.loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD;
+	renderingAttachmentInfo.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
+
+	VkRenderingInfo renderingInfo{};
+	renderingInfo.sType                = VK_STRUCTURE_TYPE_RENDERING_INFO;
+	renderingInfo.colorAttachmentCount = 1;
+	renderingInfo.pColorAttachments    = &renderingAttachmentInfo;
+	renderingInfo.layerCount           = 1;
+	renderingInfo.renderArea           = VkRect2D{ {}, m_Context.Swapchain.extent };
+
+	m_Context.DispatchTable.cmdBeginRendering(commandBuffer, &renderingInfo);
+	ImGui_ImplVulkan_NewFrame();
+	ImGui_ImplGlfw_NewFrame();
+	ImGui::NewFrame();
+	DrawImGui();
+	ImGui::Render();
+	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+	m_Context.DispatchTable.cmdEndRendering(commandBuffer);
+	m_Context.DispatchTable.cmdEndDebugUtilsLabelEXT(commandBuffer);
+}
+
+void App::DoBlitPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
+{
+	VkDebugUtilsLabelEXT debugLabel{};
+	debugLabel.sType      = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+	debugLabel.pLabelName = "blit pass";
+	static float constexpr color[4]{ .23f, 1.f, .65f, 1.f };
+	for (size_t index{}; index < std::size(debugLabel.color); ++index)
+		debugLabel.color[index] = color[index];
+	m_Context.DispatchTable.cmdBeginDebugUtilsLabelEXT(commandBuffer, &debugLabel);
+
+	auto            [sdrImage, sdrView] = m_SDRRenderTarget->AcquireNextTarget();
+	vkc::Image&     renderTarget        = m_SDREffects.empty() ? m_SwapchainImages[imageIndex] : *sdrImage;
+	vkc::ImageView& renderView          = m_SDREffects.empty() ? m_SwapchainImageViews[imageIndex] : *sdrView;
+
+	auto hdrimages = m_HDRIRenderTarget->GetImages();
+	// render target image to attachment optimal
+	{
+		vkc::Image::Transition transition{};
+		//
+		{
+			transition.SrcAccessMask = VK_ACCESS_2_NONE;
+			transition.DstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			transition.SrcStageMask  = VK_PIPELINE_STAGE_2_NONE;
+			transition.DstStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+			transition.NewLayout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		}
+		renderTarget.MakeTransition(m_Context, commandBuffer, transition);
 	}
 	// gbuffer images to read only optimal
 	{
@@ -1286,8 +1443,8 @@ void App::DoBlitPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
 	VkRenderingAttachmentInfo renderingAttachmentInfo{};
 	renderingAttachmentInfo.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
 	renderingAttachmentInfo.clearValue  = { { .03f, .03f, .03f, 1.f } };
-	renderingAttachmentInfo.imageLayout = m_SwapchainImages[imageIndex].GetLayout();
-	renderingAttachmentInfo.imageView   = m_SwapchainImageViews[imageIndex];
+	renderingAttachmentInfo.imageLayout = renderTarget.GetLayout();
+	renderingAttachmentInfo.imageView   = renderView;
 	renderingAttachmentInfo.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	renderingAttachmentInfo.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
 
@@ -1339,29 +1496,7 @@ void App::DoBlitPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
 
 		m_Context.DispatchTable.cmdDraw(commandBuffer, 3, 1, 0, 0);
 	}
-
-	ImGui_ImplVulkan_NewFrame();
-	ImGui_ImplGlfw_NewFrame();
-	ImGui::NewFrame();
-	DrawImGui();
-	ImGui::Render();
-	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
-
 	m_Context.DispatchTable.cmdEndRendering(commandBuffer);
-
-	// swapchain image to present
-	{
-		vkc::Image::Transition transition{};
-		//
-		{
-			transition.SrcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-			transition.DstAccessMask = VK_ACCESS_2_NONE;
-			transition.SrcStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-			transition.DstStageMask  = VK_PIPELINE_STAGE_2_NONE;
-			transition.NewLayout     = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-		}
-		swapchainImage.MakeTransition(m_Context, commandBuffer, transition);
-	}
 	m_Context.DispatchTable.cmdEndDebugUtilsLabelEXT(commandBuffer);
 }
 

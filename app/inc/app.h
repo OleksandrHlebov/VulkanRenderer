@@ -10,11 +10,13 @@
 #include "descriptor_set.h"
 #include "descriptor_pool.h"
 #include "descriptor_set_layout.h"
-#include "HDRI_render_target.h"
+#include "pingpong_render_target.h"
 #include "VkBootstrap.h"
 #include "timing_query_pool.h"
 
 #include <map>
+
+#include "post_processing_effect.h"
 
 class Scene;
 
@@ -33,8 +35,6 @@ public:
 	template<typename T>
 	using uptr = std::unique_ptr<T>;
 
-	void CreateScene();
-	void CreatePipelineCache();
 	App(int width, int height);
 	~App();
 
@@ -51,7 +51,9 @@ private:
 	void InitImGUI() const;
 	void DrawImGui();
 	void CreateWindow(int width, int height);
+	void CreateScene();
 	void CreateInstance();
+	void CreatePipelineCache();
 	void CreateSurface();
 	void CreateDevice();
 	void CreateSwapchain();
@@ -62,6 +64,7 @@ private:
 	void CreateGraphicsPipeline();
 	void CreateCmdPool();
 	void CreateDescriptorSetLayouts();
+	void LoadPostProcessingEffects();
 	void GenerateShadowMaps();
 	void CreateResources();
 	void CreateGBuffer();
@@ -72,6 +75,8 @@ private:
 	void Present(uint32_t imageIndex);
 	void End();
 
+	void DoPostProcessing(vkc::CommandBuffer& commandBuffer, size_t imageIndex, int& priority);
+	void DoImGUIPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex);
 	void DoBlitPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex);
 	void DoLightingPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex) const;
 	void DoGBufferPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex) const;
@@ -118,7 +123,8 @@ private:
 	uptr<vkc::Image>     m_MaterialImage{};
 	uptr<vkc::ImageView> m_MaterialView{};
 
-	uptr<HDRIRenderTarget> m_HDRIRenderTarget{};
+	uptr<PingPongRenderTarget> m_HDRIRenderTarget{};
+	uptr<PingPongRenderTarget> m_SDRRenderTarget{};
 
 	VkSampler m_TextureSampler{};
 	VkSampler m_ShadowSampler{};
@@ -135,6 +141,8 @@ private:
 	std::vector<vkc::DescriptorSet> m_FrameDescriptorSets{};
 	std::vector<vkc::DescriptorSet> m_GlobalDescriptorSets{};
 	std::vector<vkc::DescriptorSet> m_GbufferDescriptorSets{};
+
+	std::vector<PostProcessingEffect> m_SDREffects{};
 
 	std::vector<VkSemaphore> m_ImageAvailableSemaphores{};
 	std::vector<VkSemaphore> m_RenderFinishedSemaphores{};

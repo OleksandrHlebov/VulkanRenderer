@@ -13,8 +13,9 @@ set(COMPILED_SHADERS)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/shaders)
 macro(Shader_Compile name)
 	get_filename_component(SHADER_FILENAME_WE ${name} NAME_WE)
+	get_filename_component(SHADER_FILENAME_DIR ${name} DIRECTORY)
 	set(SHADER_SOURCE ${PROJECT_SOURCE_DIR}/shaders/${name})
-	set(SHADER_SPIRV_PATH ${CMAKE_BINARY_DIR}/shaders/${SHADER_FILENAME_WE}.spv)
+	set(SHADER_SPIRV_PATH ${CMAKE_BINARY_DIR}/shaders/${SHADER_FILENAME_DIR}/${SHADER_FILENAME_WE}.spv)
 
 	add_custom_command(OUTPUT ${SHADER_SPIRV_PATH}
 	                   COMMAND glslang -V --target-env vulkan1.3 ${SHADER_SOURCE} -o ${SHADER_SPIRV_PATH}
@@ -39,7 +40,8 @@ set(SHADER_SOURCES
     "lighting.frag"
     "quad.vert"
     "frag_depth_override.frag"
-    "blit.frag")
+    "blit.frag"
+    "sdr_post_processing/film_grain.frag")
 
 set(HEADER
     inc/helper.h
@@ -48,8 +50,9 @@ set(HEADER
     inc/world_time.h
     inc/scene.h
     inc/mesh.h
-    inc/HDRI_render_target.h
-    inc/shadow_generation.h)
+    inc/pingpong_render_target.h
+    inc/shadow_generation.h
+    inc/post_processing_effect.h)
 
 set(SOURCE
     src/app.cpp
@@ -57,9 +60,10 @@ set(SOURCE
     src/world_time.cpp
     src/scene.cpp
     src/mesh.cpp
-    src/HDRI_render_target.cpp
+    src/pingpong_render_target.cpp
     src/timing_query_pool.cpp
-    inc/timing_query_pool.h)
+    inc/timing_query_pool.h
+    src/post_processing_effect.cpp)
 
 add_library(App STATIC
             ${SOURCE}
