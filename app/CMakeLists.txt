@@ -41,7 +41,8 @@ set(SHADER_SOURCES
     "quad.vert"
     "frag_depth_override.frag"
     "blit.frag"
-    "sdr_post_processing/film_grain.frag")
+    "sdr_post_processing/film_grain.frag"
+    "sdr_post_processing/simple_colour_overlay.frag")
 
 set(HEADER
     inc/helper.h

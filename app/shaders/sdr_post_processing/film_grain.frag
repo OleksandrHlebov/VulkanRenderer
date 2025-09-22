@@ -1,14 +1,8 @@
 #version 450
-#extension GL_EXT_samplerless_texture_functions: require
 #extension GL_ARB_gpu_shader_int64: require
+#extension GL_ARB_shading_language_include: require
+#include "sdr_available_data.glsl"
 //https://godotshaders.com/shader/film-grain-shader/
-layout (location = 0) in vec2 inUV;
-
-layout (location = 0) out vec4 outColour;
-//
-//float grainAmount = .05f;
-//float grainSize = .5f;
-
 // references used for randomness
 // https://amindforeverprogramming.blogspot.com/2013/07/random-floats-in-glsl-330.html
 // https://www.reedbeta.com/blog/quick-and-easy-gpu-random-numbers-in-d3d11/
@@ -43,20 +37,18 @@ uint Rand()
     return pseudoRNGState;
 }
 
-layout (set = 0, binding = 0) uniform sampler samp;
-
-layout (set = 1, binding = 4) uniform texture2D SDRImage[2];
-
 layout (push_constant) uniform constants
 {
     uint64_t time;
     uint lastImageIndex;
     float grainAmount;
     float grainSize;
+    //    bool bAnimate;
 };
 
 void main()
 {
+    //    pseudoRNGState = WangHash(uvec3(time & float(bAnimate), gl_FragCoord.x, gl_FragCoord.y));
     pseudoRNGState = WangHash(uvec3(time, gl_FragCoord.x, gl_FragCoord.y));
     vec4 original = texelFetch(sampler2D(SDRImage[lastImageIndex], samp), ivec2(inUV.xy * textureSize(SDRImage[lastImageIndex], 0)), 0);
 

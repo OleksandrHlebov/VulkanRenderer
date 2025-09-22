@@ -131,7 +131,8 @@ void PostProcessingEffect::Render
 		debugLabel.color[index] = color[index];
 	context.DispatchTable.cmdBeginDebugUtilsLabelEXT(commandBuffer, &debugLabel);
 
-	auto [lastImage, lastView] = renderData.PingPongTarget.AcquireLastRenderedToTarget();
+	auto     [lastImage, lastView] = renderData.PingPongTarget.AcquireLastRenderedToTarget();
+	uint32_t lastRenderedToIndex{ renderData.PingPongTarget.GetCurrentImageIndex() };
 
 	vkc::Image& renderTarget = renderToSwapchain
 							   ? renderData.SwapchainImage
@@ -215,9 +216,8 @@ void PostProcessingEffect::Render
 													, nullptr);
 		uint64_t time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).
 			count();
-		uint32_t index = renderData.PingPongTarget.GetLastImageIndex();
 		std::memcpy(m_PushConstants.data(), &time, sizeof(time));
-		std::memcpy(std::next(m_PushConstants.data(), sizeof(time)), &index, sizeof(index));
+		std::memcpy(std::next(m_PushConstants.data(), sizeof(time)), &lastRenderedToIndex, sizeof(lastRenderedToIndex));
 		context.DispatchTable.cmdPushConstants(commandBuffer
 											   , *m_PipelineLayout
 											   , VK_SHADER_STAGE_FRAGMENT_BIT
