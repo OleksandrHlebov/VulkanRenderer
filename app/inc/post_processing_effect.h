@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "delegate.h"
 #include "spirv_reflect.h"
 
 class PingPongRenderTarget;
@@ -77,10 +78,22 @@ public:
 
 	void DrawImGUI();
 
-	std::string const& GetName() const
+	bool operator<(PostProcessingEffect const& other) const
+	{
+		return this->m_Name < other.m_Name;
+	}
+
+	[[nodiscard]] bool IsEnabled() const
+	{
+		return m_Enabled;
+	}
+
+	[[nodiscard]] std::string const& GetName() const
 	{
 		return m_Name;
 	}
+
+	Event<PostProcessingEffect&> OnToggle{};
 
 private:
 	template<typename T>
@@ -92,6 +105,7 @@ private:
 	DescriptorData              m_DescriptorData;
 	std::vector<char>           m_PushConstants;
 	std::vector<ShaderVariable> m_ShaderVariables;
+	bool                        m_Enabled{ true };
 };
 
 #endif //VULKANRESEARCH_POSTPROCESSINGEFFECT_H

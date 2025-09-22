@@ -533,7 +533,7 @@ void App::CreateDescriptorSetLayouts()
 
 void App::LoadPostProcessingEffects()
 {
-	PostProcessingEffect::DescriptorData descriptorData{
+	PostProcessingEffect::DescriptorData const descriptorData{
 		.GBufferSetLayout = *m_GbufferDescSetLayout
 		, .GBufferSet = m_GbufferDescriptorSets
 		, .GlobalSetLayout = *m_GlobalDescSetLayout
@@ -543,11 +543,13 @@ void App::LoadPostProcessingEffects()
 		if (entry.path().has_filename())
 		{
 			std::cout << "found shader entry: " << entry.path().stem() << std::endl;
-			m_SDREffects.emplace_back(m_Context
-									  , descriptorData
-									  , *m_PipelineCache
-									  , PostProcessingEffect::Type::SDR
-									  , entry.path());
+			auto& effect = m_SDREffects.emplace_back(m_Context
+													 , descriptorData
+													 , *m_PipelineCache
+													 , PostProcessingEffect::Type::SDR
+													 , entry.path());
+			++m_EnabledSDREffectsCount;
+			effect.OnToggle.Bind(ToggleEffect);
 		}
 }
 
@@ -1334,22 +1336,26 @@ void App::DoPostProcessing(vkc::CommandBuffer& commandBuffer, size_t imageIndex,
 		, .PingPongTarget = *m_SDRRenderTarget
 	};
 	for (auto& ppeffect: m_SDREffects)
-		m_QueryPool->RecordWholePipe(commandBuffer
-									 , ppeffect.GetName()
-									 , priority++
-									 , [this, &commandBuffer, &renderData, &ppeffect]
-									 {
-										 ppeffect.Render(m_Context
-														 , commandBuffer
-														 , renderData
-														 , m_CurrentFrame
-														 , &ppeffect == &m_SDREffects.back());
-									 });
+	{
+		if (ppeffect.IsEnabled())
+			m_QueryPool->RecordWholePipe(commandBuffer
+										 , ppeffect.GetName()
+										 , priority
+										 , [this, &commandBuffer, &renderData, &ppeffect]
+										 {
+											 ppeffect.Render(m_Context
+															 , commandBuffer
+															 , renderData
+															 , m_CurrentFrame
+															 , &ppeffect == &m_SDREffects.back());
+										 });
+		++priority;
+	}
 
 	m_Context.DispatchTable.cmdEndDebugUtilsLabelEXT(commandBuffer);
 }
 
-void App::DoImGUIPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
+void App::DoImGUIPass(vkc::CommandBuffer const& commandBuffer, size_t imageIndex)
 {
 	VkDebugUtilsLabelEXT debugLabel{};
 	debugLabel.sType      = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
@@ -1411,8 +1417,8 @@ void App::DoBlitPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex)
 	m_Context.DispatchTable.cmdBeginDebugUtilsLabelEXT(commandBuffer, &debugLabel);
 
 	auto            [sdrImage, sdrView] = m_SDRRenderTarget->AcquireNextTarget();
-	vkc::Image&     renderTarget        = m_SDREffects.empty() ? m_SwapchainImages[imageIndex] : *sdrImage;
-	vkc::ImageView& renderView          = m_SDREffects.empty() ? m_SwapchainImageViews[imageIndex] : *sdrView;
+	vkc::Image&     renderTarget        = m_EnabledSDREffectsCount == 0 ? m_SwapchainImages[imageIndex] : *sdrImage;
+	vkc::ImageView& renderView          = m_EnabledSDREffectsCount == 0 ? m_SwapchainImageViews[imageIndex] : *sdrView;
 
 	auto hdrimages = m_HDRIRenderTarget->GetImages();
 	// render target image to attachment optimal

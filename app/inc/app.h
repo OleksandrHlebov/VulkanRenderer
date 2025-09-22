@@ -76,11 +76,24 @@ private:
 	void End();
 
 	void DoPostProcessing(vkc::CommandBuffer& commandBuffer, size_t imageIndex, int& priority);
-	void DoImGUIPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex);
+	void DoImGUIPass(vkc::CommandBuffer const& commandBuffer, size_t imageIndex);
 	void DoBlitPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex);
 	void DoLightingPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex) const;
 	void DoGBufferPass(vkc::CommandBuffer& commandBuffer, size_t imageIndex) const;
 	void DoDepthPrepass(vkc::CommandBuffer const& commandBuffer, size_t imageIndex) const;
+
+	Delegate<PostProcessingEffect&> ToggleEffect{
+		[this](PostProcessingEffect const& effect)
+		{
+			if (effect.IsEnabled())
+				++m_EnabledSDREffectsCount;
+			else
+			{
+				assert(m_EnabledSDREffectsCount > 0);
+				--m_EnabledSDREffectsCount;
+			}
+		}
+	};
 
 	Config                m_Config;
 	uptr<TimingQueryPool> m_QueryPool;
@@ -143,6 +156,7 @@ private:
 	std::vector<vkc::DescriptorSet> m_GbufferDescriptorSets{};
 
 	std::vector<PostProcessingEffect> m_SDREffects{};
+	uint32_t                          m_EnabledSDREffectsCount{};
 
 	std::vector<VkSemaphore> m_ImageAvailableSemaphores{};
 	std::vector<VkSemaphore> m_RenderFinishedSemaphores{};

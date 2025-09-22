@@ -63,7 +63,8 @@ set(SOURCE
     src/pingpong_render_target.cpp
     src/timing_query_pool.cpp
     inc/timing_query_pool.h
-    src/post_processing_effect.cpp)
+    src/post_processing_effect.cpp
+    inc/delegate.h)
 
 add_library(App STATIC
             ${SOURCE}

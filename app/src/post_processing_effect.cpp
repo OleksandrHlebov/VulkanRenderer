@@ -123,13 +123,13 @@ void PostProcessingEffect::Render
 	vkc::Context& context, vkc::CommandBuffer& commandBuffer, RenderData& renderData, uint32_t frameIndex, bool renderToSwapchain
 )
 {
-	// VkDebugUtilsLabelEXT debugLabel{};
-	// debugLabel.sType      = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
-	// debugLabel.pLabelName = "blit pass";
-	// static float constexpr color[4]{ .23f, 1.f, .65f, 1.f };
-	// for (size_t index{}; index < std::size(debugLabel.color); ++index)
-	// 	debugLabel.color[index] = color[index];
-	// context.DispatchTable.cmdBeginDebugUtilsLabelEXT(commandBuffer, &debugLabel);
+	VkDebugUtilsLabelEXT debugLabel{};
+	debugLabel.sType      = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+	debugLabel.pLabelName = m_Name.c_str();
+	static float constexpr color[4]{ .23f, 1.f, .65f, 1.f };
+	for (size_t index{}; index < std::size(debugLabel.color); ++index)
+		debugLabel.color[index] = color[index];
+	context.DispatchTable.cmdBeginDebugUtilsLabelEXT(commandBuffer, &debugLabel);
 
 	auto [lastImage, lastView] = renderData.PingPongTarget.AcquireLastRenderedToTarget();
 
@@ -228,13 +228,18 @@ void PostProcessingEffect::Render
 		context.DispatchTable.cmdDraw(commandBuffer, 3, 1, 0, 0);
 	}
 	context.DispatchTable.cmdEndRendering(commandBuffer);
-	// context.DispatchTable.cmdEndDebugUtilsLabelEXT(commandBuffer);
+	context.DispatchTable.cmdEndDebugUtilsLabelEXT(commandBuffer);
 }
 
 void PostProcessingEffect::DrawImGUI()
 {
 	if (ImGui::CollapsingHeader(m_Name.c_str()))
 	{
+		bool const wasEnabled{ m_Enabled };
+		ImGui::Checkbox("Enabled", &m_Enabled);
+
+		if (wasEnabled != m_Enabled)
+			OnToggle.Execute(*this);
 		for (auto& shaderVariable: m_ShaderVariables)
 		{
 			ImGui::SliderFloat(shaderVariable.Name.c_str(), reinterpret_cast<float*>(shaderVariable.DataAddress), .0f, 1.f);
