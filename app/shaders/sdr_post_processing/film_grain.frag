@@ -43,22 +43,20 @@ layout (push_constant) uniform constants
     uint lastImageIndex;
     float grainAmount;
     float grainSize;
-    //    bool bAnimate;
+    vec2 frequency;
+    vec3 colour;
+    uint seed;
+    bool b_Animate;
 };
 
 void main()
 {
     //    pseudoRNGState = WangHash(uvec3(time & float(bAnimate), gl_FragCoord.x, gl_FragCoord.y));
-    pseudoRNGState = WangHash(uvec3(time, gl_FragCoord.x, gl_FragCoord.y));
+    pseudoRNGState = WangHash(uvec3(time * uint(b_Animate) + seed * (1 - uint(b_Animate)), gl_FragCoord.x * frequency.x, gl_FragCoord.y * frequency.y));
     vec4 original = texelFetch(sampler2D(SDRImage[lastImageIndex], samp), ivec2(inUV.xy * textureSize(SDRImage[lastImageIndex], 0)), 0);
 
-    vec2 randomVector = vec2(
-    float(Rand()) * (1.0 / 4294967296.0),
-    float(Rand()) * (1.0 / 4294967296.0)
-    );
-
-    float noise = (fract(sin(dot(randomVector, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 2.0;
-    original.rgb += noise * grainAmount * grainSize;
+    float noise = float(Rand()) * (1.0 / 4294967296.0);
+    original.rgb += colour * noise * grainAmount * grainSize;
 
     outColour = clamp(original, .0, 1.);
 }

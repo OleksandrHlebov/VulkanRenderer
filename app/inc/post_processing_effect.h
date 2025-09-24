@@ -36,6 +36,7 @@ public:
 	{
 		std::string               Name;
 		SpvReflectTypeFlags const Type;
+		size_t                    Size;
 		bool                      IsSigned;
 		char* const               DataAddress;
 	};
@@ -96,6 +97,12 @@ public:
 	Event<PostProcessingEffect&> OnToggle{};
 
 private:
+	inline static uint32_t m_Counter{};
+
+	uint32_t const m_ID = m_Counter++;
+
+	static void InitializePushConstant
+	(std::unordered_map<std::string, std::string>& defaultValues, SpvReflectBlockVariable const& member, ShaderVariable& variable);
 	template<typename T>
 	using uptr = std::unique_ptr<T>;
 	std::string               m_Name;

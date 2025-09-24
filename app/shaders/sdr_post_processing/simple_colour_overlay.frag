@@ -7,14 +7,12 @@ layout (push_constant) uniform constants
 {
     uint64_t time;
     uint lastImageIndex;
-    float red;
-    float green;
-    float blue;
+    vec3 colour;
 };
 
 void main()
 {
     vec4 original = texelFetch(sampler2D(SDRImage[lastImageIndex], samp), ivec2(inUV.xy * textureSize(SDRImage[lastImageIndex], 0)), 0);
 
-    outColour = vec4(clamp(original.rgb + vec3(red, green, blue), .0f, 1.f), 1.f);
+    outColour = vec4(clamp(original.rgb + colour, .0f, 1.f), 1.f);
 }

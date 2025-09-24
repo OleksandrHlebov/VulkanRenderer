@@ -1335,20 +1335,23 @@ void App::DoPostProcessing(vkc::CommandBuffer& commandBuffer, size_t imageIndex,
 		, .SwapchainImageView = m_SwapchainImageViews[imageIndex]
 		, .PingPongTarget = *m_SDRRenderTarget
 	};
+	uint32_t enabledEffectsExecutedCount{};
 	for (auto& ppeffect: m_SDREffects)
 	{
 		if (ppeffect.IsEnabled())
+		{
 			m_QueryPool->RecordWholePipe(commandBuffer
 										 , ppeffect.GetName()
 										 , priority
-										 , [this, &commandBuffer, &renderData, &ppeffect]
+										 , [this, &commandBuffer, &renderData, &ppeffect, &enabledEffectsExecutedCount]
 										 {
 											 ppeffect.Render(m_Context
 															 , commandBuffer
 															 , renderData
 															 , m_CurrentFrame
-															 , &ppeffect == &m_SDREffects.back());
+															 , ++enabledEffectsExecutedCount == m_EnabledSDREffectsCount);
 										 });
+		}
 		++priority;
 	}
 

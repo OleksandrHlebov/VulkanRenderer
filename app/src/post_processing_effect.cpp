@@ -1,5 +1,9 @@
 #include "post_processing_effect.h"
 
+#include <variant>
+#include <glm/glm.hpp>
+#include <iostream>
+
 #include "pipeline.h"
 #include "pipeline_layout.h"
 #include "descriptor_set.h"
@@ -8,7 +12,85 @@
 #include "helper.h"
 #include "pingpong_render_target.h"
 #include "spirv_reflect.h"
-#include "../../cmake-build-release-visual-studio/_deps/imgui-src/imgui.h"
+#include "imgui.h"
+
+void PostProcessingEffect::InitializePushConstant
+(std::unordered_map<std::string, std::string>& defaultValues, SpvReflectBlockVariable const& member, ShaderVariable& variable)
+{
+	std::variant<uint32_t, int, float, glm::vec2, glm::vec3, glm::vec4> defaultValue;
+	if (variable.Type & SPV_REFLECT_TYPE_FLAG_BOOL) // never happens, bools reflected as ints
+	{
+		std::cout << "Found bool!" << std::endl;
+	}
+	else if (variable.Type & SPV_REFLECT_TYPE_FLAG_INT)
+	{
+		// TODO: integer vector support
+		if (variable.Name.substr(0, 2) == "b_") // enforce naming convention as bools cannot be reflected properly
+		{
+			std::cout << "Found bool!" << std::endl;
+			bool b;
+			std::istringstream(defaultValues[variable.Name]) >> std::boolalpha >> b;
+			defaultValue = static_cast<VkBool32>(b);
+		}
+		else
+		{
+			std::cout << "Found int!" << std::endl;
+			if (variable.IsSigned)
+				defaultValue = std::stoi(defaultValues[variable.Name]);
+			else
+				defaultValue = static_cast<uint32_t>(std::stoul(defaultValues[variable.Name]));
+		}
+	}
+	else if (variable.Type & SPV_REFLECT_TYPE_FLAG_FLOAT)
+	{
+		bool const isVector{ static_cast<bool>(variable.Type & SPV_REFLECT_TYPE_FLAG_VECTOR) };
+		std::cout << "Found float";
+		if (isVector)
+			std::cout << " vector of " + std::to_string(member.type_description->traits.numeric.vector.component_count) + " components";
+		std::cout << '!' << std::endl;
+
+		if (isVector)
+		{
+			switch (member.type_description->traits.numeric.vector.component_count)
+			{
+			case 2:
+			{
+				glm::vec2 temp{};
+				char      delim;
+				std::istringstream(defaultValues[variable.Name]) >> temp.x >> delim >> temp.y;
+				defaultValue = temp;
+				break;
+			}
+			case 3:
+			{
+				glm::vec3 temp{};
+				char      delim;
+				std::istringstream(defaultValues[variable.Name]) >> temp.x >> delim >> temp.y >> delim >> temp.z;
+				defaultValue = temp;
+				break;
+			}
+			case 4:
+			{
+				glm::vec4 temp{};
+				char      delim;
+				std::istringstream(defaultValues[variable.Name]) >> temp.x >> delim >> temp.y >> delim >> temp.z >> delim >> temp.w;
+				defaultValue = temp;
+				break;
+			}
+			default:
+				break;
+			}
+		}
+		else
+			defaultValue = std::stof(defaultValues[variable.Name]);
+	}
+
+	std::visit([&variable](auto& value)
+			   {
+				   std::memcpy(variable.DataAddress, &value, sizeof(value));
+			   }
+			   , defaultValue);
+}
 
 PostProcessingEffect::PostProcessingEffect
 (
@@ -20,7 +102,7 @@ PostProcessingEffect::PostProcessingEffect
 {
 	//
 	{
-		std::unordered_map<std::string, float> defaultValues;
+		std::unordered_map<std::string, std::string> defaultValues;
 		std::filesystem::path configPath{ std::filesystem::path{ "data/configs/" } / (shaderPath.stem().string() + ".ini") };
 		if (std::ifstream file{ configPath })
 		{
@@ -31,7 +113,7 @@ PostProcessingEffect::PostProcessingEffect
 			{
 				std::string value;
 				std::getline(file, value);
-				defaultValues[varName] = std::stof(value);
+				defaultValues[varName] = value;
 			}
 		}
 		else
@@ -57,12 +139,13 @@ PostProcessingEffect::PostProcessingEffect
 			// first 2 expected to be time and array index
 			for (uint32_t memberIndex{ 2 }; memberIndex < blockVariable->member_count; ++memberIndex)
 			{
-				auto& member = blockVariable->members[memberIndex];
-				m_ShaderVariables.emplace_back(member.name
-											   , member.type_description->type_flags
-											   , blockVariable->type_description->traits.numeric.scalar.signedness
-											   , &m_PushConstants[member.offset]);
-				std::memcpy(m_ShaderVariables[memberIndex - 2].DataAddress, &(defaultValues[member.name]), sizeof(float));
+				auto& member   = blockVariable->members[memberIndex];
+				auto& variable = m_ShaderVariables.emplace_back(member.name
+																, member.type_description->type_flags
+																, member.size
+																, blockVariable->type_description->traits.numeric.scalar.signedness
+																, &m_PushConstants[member.offset]);
+				InitializePushConstant(defaultValues, member, variable);
 			}
 		}
 
@@ -235,14 +318,61 @@ void PostProcessingEffect::DrawImGUI()
 {
 	if (ImGui::CollapsingHeader(m_Name.c_str()))
 	{
+		uint32_t objectID{};
+		ImGui::PushID((std::stringstream(m_Name) << m_ID << objectID++).str().c_str());
 		bool const wasEnabled{ m_Enabled };
 		ImGui::Checkbox("Enabled", &m_Enabled);
+		ImGui::PopID();
 
 		if (wasEnabled != m_Enabled)
 			OnToggle.Execute(*this);
-		for (auto& shaderVariable: m_ShaderVariables)
+		for (auto& [Name, Type, Size, IsSigned, DataAddress]: m_ShaderVariables)
 		{
-			ImGui::SliderFloat(shaderVariable.Name.c_str(), reinterpret_cast<float*>(shaderVariable.DataAddress), .0f, 1.f);
+			ImGui::PushID((std::stringstream(m_Name) << m_ID << objectID++).str().c_str());
+			if (Type & SPV_REFLECT_TYPE_FLAG_INT)
+			{
+				if (Name.substr(0, 2) == "b_")
+				{
+					auto const data{ reinterpret_cast<VkBool32*>(DataAddress) };
+					bool       temp{ static_cast<bool>(*data) };
+					ImGui::Checkbox(Name.c_str(), &temp);
+					*data = static_cast<VkBool32>(temp);
+				}
+				else if (IsSigned)
+					ImGui::SliderInt(Name.c_str(), reinterpret_cast<int*>(DataAddress), -255, 255);
+				else
+				{
+					auto const data{ reinterpret_cast<uint32_t*>(DataAddress) };
+					int        temp{ static_cast<int>(*data) };
+					ImGui::SliderInt(Name.c_str(), &temp, 0, 255);
+					*data = static_cast<uint32_t>(temp);
+				}
+			}
+			else if (Type & SPV_REFLECT_TYPE_FLAG_FLOAT)
+			{
+				if (Type & SPV_REFLECT_TYPE_FLAG_VECTOR)
+				{
+					uint32_t const elementCount{ static_cast<uint32_t>(Size / sizeof(float)) };
+					assert(1 < elementCount && elementCount <= 4);
+					switch (elementCount)
+					{
+					case 2:
+						ImGui::SliderFloat2(Name.c_str(), reinterpret_cast<float*>(DataAddress), .0f, 1.0f);
+						break;
+					case 3:
+						ImGui::SliderFloat3(Name.c_str(), reinterpret_cast<float*>(DataAddress), .0f, 1.0f);
+						break;
+					case 4:
+						ImGui::SliderFloat4(Name.c_str(), reinterpret_cast<float*>(DataAddress), .0f, 1.0f);
+						break;
+					default:
+						break;
+					}
+				}
+				else
+					ImGui::SliderFloat(Name.c_str(), reinterpret_cast<float*>(DataAddress), .0f, 1.f);
+			}
+			ImGui::PopID();
 		}
 	}
 }
