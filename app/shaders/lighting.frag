@@ -29,21 +29,21 @@ struct Light
     uint matrixIndex;
 };
 
-layout(constant_id = 0) const uint LIGHT_COUNT = 1u;
-layout(constant_id = 1) const uint DIRECTIONAL_LIGHT_COUNT = 1u;
-layout(constant_id = 2) const uint POINT_LIGHT_COUNT = 0u;
-layout(constant_id = 3) const bool ENABLE_DIRECTIONAL_LIGHT = true;
-layout(constant_id = 4) const bool ENABLE_POINT_LIGHT = true;
-layout(constant_id = 5) const float SHADOW_FAR_PLANE = 100.f;
-layout(std430, set = 1, binding = 1) readonly buffer LightsSSBO
+layout (constant_id = 0) const uint LIGHT_COUNT = 1u;
+layout (constant_id = 1) const uint DIRECTIONAL_LIGHT_COUNT = 1u;
+layout (constant_id = 2) const uint POINT_LIGHT_COUNT = 0u;
+layout (constant_id = 3) const bool ENABLE_DIRECTIONAL_LIGHT = true;
+layout (constant_id = 4) const bool ENABLE_POINT_LIGHT = true;
+layout (constant_id = 5) const float SHADOW_FAR_PLANE = 100.f;
+layout (std430, set = 1, binding = 1) readonly buffer LightsSSBO
 {
     Light lights[LIGHT_COUNT];
 };
-layout(std430, set = 1, binding = 2) readonly buffer LightMatricesSSBO
+layout (std430, set = 1, binding = 2) readonly buffer LightMatricesSSBO
 {
     mat4 matrices[DIRECTIONAL_LIGHT_COUNT];
 };
-layout(set = 1, binding = 3) uniform sampler shadowSampler;
+layout (set = 1, binding = 3) uniform sampler shadowSampler;
 
 float DistributionGGX(vec3 N, vec3 H, float a)
 {
@@ -110,7 +110,9 @@ vec3 CalculateLight(vec3 viewDirection, vec3 lightDirection, vec3 normal, vec3 l
 {
     const vec3 F0 = mix(vec3(.04f), albedoColour.rgb, metalness);
     const vec3 halfway = normalize(viewDirection + lightDirection);
-    const vec3 irradiance = lightColour.rgb * illuminance;
+
+    const float NdotL = max(dot(normal, lightDirection), .0f);
+    const vec3 radiance = lightColour.rgb * illuminance * NdotL;
     const vec3 F = FresnelSchlick(max(dot(halfway, viewDirection), .0f), F0);
     const float NDF = DistributionGGX(normal, halfway, roughness);
     const float G = GeometrySmith(normal, viewDirection, lightDirection, roughness);
@@ -120,9 +122,7 @@ vec3 CalculateLight(vec3 viewDirection, vec3 lightDirection, vec3 normal, vec3 l
 
     const vec3 kS = F;
     const vec3 kD = (vec3(1.f) - kS) * (1.f - metalness);
-
-    float NdotL = max(dot(normal, lightDirection), .0f);
-    return (kD * albedoColour.rgb / PI + specular) * irradiance * NdotL;
+    return (kD * albedoColour.rgb / PI + specular) * radiance;
 }
 
 void main()
@@ -169,7 +169,7 @@ void main()
 
         const float illuminance = luminousIntensity * attenuation;
 
-        vec3 fragToLight =  -lights[lightIndex].position.xyz + worldPosition;
+        vec3 fragToLight = -lights[lightIndex].position.xyz + worldPosition;
         float currentDepth = length(fragToLight) / SHADOW_FAR_PLANE;
         float shadow = texture(samplerCubeShadow(cubemaps[lights[lightIndex].shadowMapIndex], shadowSampler), vec4(fragToLight, currentDepth)).r;
 
