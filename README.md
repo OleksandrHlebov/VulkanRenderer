@@ -17,6 +17,7 @@ Renderer made using Vulkan 1.3, utilising own [vulkan wrapper library](https://g
     * **Blit pass** tonemapping HDR to LDR, physics based camera exposure
 * **Lighting** featuring point lights and directional lights, with pregenerated during initialisation shadows maps for both.
 * **Pool queries** used to acquire GPU timings to display for profiling purposes
+* **Pipeline cache**
 
 # Screenshots
 
@@ -32,9 +33,15 @@ Renderer made using Vulkan 1.3, utilising own [vulkan wrapper library](https://g
 
 <img src="screenshots/gbuffer-normals-material.png" alt="normals-material" width="720"/>
 
-- Encoded normals (.rg values)<img src="screenshots/normals.png" alt="normals" width="720"/>
-- Roughness (.g value)<img src="screenshots/roughness.png" alt="roughness" width="720"/>
-- Metalness (.a value)<img src="screenshots/metalness.png" alt="metalness" width="720"/>
+- Encoded normals (.rg values)
+
+  <img src="screenshots/normals.png" alt="normals" width="720"/>
+- Roughness (.g value)
+
+  <img src="screenshots/roughness.png" alt="roughness" width="720"/>
+- Metalness (.a value)
+
+  <img src="screenshots/metalness.png" alt="metalness" width="720"/>
 
 # Libraries used
 
