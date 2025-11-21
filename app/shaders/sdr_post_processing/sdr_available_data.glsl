@@ -1,7 +1,7 @@
 // this header contains all the data at your disposal from the renderer
 // to use in the custom sdr post-processing shader
 // it has to be included in .frag for compilation using:
-//#extension GL_ARB_shading_language_include: require
+//#extension GL_GOOGLE_include_directive: require
 //#include "sdr_available_data.glsl"
 #extension GL_EXT_samplerless_texture_functions: require
 

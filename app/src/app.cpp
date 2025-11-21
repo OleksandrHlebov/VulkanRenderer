@@ -542,14 +542,17 @@ void App::LoadPostProcessingEffects()
 	for (auto const& entry: std::filesystem::directory_iterator("shaders/sdr_post_processing/"))
 		if (entry.path().has_filename())
 		{
-			std::cout << "found shader entry: " << entry.path().stem() << std::endl;
-			auto& effect = m_SDREffects.emplace_back(m_Context
-													 , descriptorData
-													 , *m_PipelineCache
-													 , PostProcessingEffect::Type::SDR
-													 , entry.path());
-			++m_EnabledSDREffectsCount;
-			effect.OnToggle.Bind(ToggleEffect);
+			if (entry.path().extension().string() == ".spv")
+			{
+				std::cout << "found shader entry: " << entry.path().stem() << std::endl;
+				auto& effect = m_SDREffects.emplace_back(m_Context
+														 , descriptorData
+														 , *m_PipelineCache
+														 , PostProcessingEffect::Type::SDR
+														 , entry.path());
+				++m_EnabledSDREffectsCount;
+				effect.OnToggle.Bind(ToggleEffect);
+			}
 		}
 }
 
