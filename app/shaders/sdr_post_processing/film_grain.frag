@@ -1,6 +1,6 @@
 #version 450
 #extension GL_ARB_gpu_shader_int64: require
-#extension GL_ARB_shading_language_include: require
+#extension GL_GOOGLE_include_directive: require
 #include "sdr_available_data.glsl"
 //https://godotshaders.com/shader/film-grain-shader/
 // references used for randomness
